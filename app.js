@@ -2,17 +2,24 @@ const state = {
   services: [],
   authorizations: [],
   providers: [],
-  clients: []
+  clients: [],
+  vehicles: []
 };
 
 let firebaseReady = false;
 let db = null;
 let firestoreCollection = null;
 let firestoreOnSnapshot = null;
+let firestoreCollectionGroup = null;
+let firestoreDoc = null;
+let firestoreGetDoc = null;
+let firestoreUpdateDoc = null;
+let firestoreServerTimestamp = null;
 
 let unsubscribeServices = null;
 let unsubscribeProviders = null;
 let unsubscribeClients = null;
+let unsubscribeVehicles = null;
 
 const kpiTopData = [
   ["Pendientes","0","◷","pending"],
@@ -318,6 +325,71 @@ function convertirCliente(doc){
   };
 }
 
+
+function obtenerIniciales(nombre){
+  const partes = String(nombre || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!partes.length) return "CL";
+
+  return partes
+    .slice(0,2)
+    .map(p => p.charAt(0).toUpperCase())
+    .join("");
+}
+
+function tiempoRelativo(valor){
+  const ms = obtenerMilisegundos(valor);
+  if (!ms) return "Sin fecha";
+
+  const diferencia = Math.max(0,Date.now() - ms);
+  const minutos = Math.floor(diferencia / 60000);
+
+  if (minutos < 1) return "Ahora";
+  if (minutos < 60) return `Hace ${minutos} min`;
+
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `Hace ${horas} ${horas === 1 ? "hora" : "horas"}`;
+
+  const dias = Math.floor(horas / 24);
+  return `Hace ${dias} ${dias === 1 ? "día" : "días"}`;
+}
+
+function reconstruirAutorizaciones(){
+  state.authorizations = state.vehicles
+    .filter(v =>
+      v.estadoMembresiaVehiculo === "pendiente_autorizacion" ||
+      v.requiereAutorizacion === true
+    )
+    .map(v => {
+      const cliente = state.clients.find(c => c.id === v.uidCliente);
+      const nombre = cliente?.name || "Cliente";
+      const membresia =
+        v.numeroMembresiaSolicitada ||
+        cliente?.membership ||
+        "Sin número";
+
+      return {
+        vehicleId: v.id,
+        uidCliente: v.uidCliente,
+        path: v.path,
+        initials: obtenerIniciales(nombre),
+        name: nombre,
+        detail: `Vehículo: ${v.placas || "Sin placas"} | ${v.marca || ""} ${v.subMarca || ""}`.trim(),
+        type: "Vehículo",
+        time: tiempoRelativo(v.solicitudMembresiaEn || v.creadoEn),
+        membership: membresia,
+        raw: v.raw
+      };
+    })
+    .sort((a,b) =>
+      obtenerMilisegundos(b.raw?.solicitudMembresiaEn || b.raw?.creadoEn) -
+      obtenerMilisegundos(a.raw?.solicitudMembresiaEn || a.raw?.creadoEn)
+    );
+}
+
 function recalcularKpis(){
   const contarEstado = estado =>
     state.services.filter(servicio => servicio.estado === estado).length;
@@ -487,8 +559,8 @@ function renderAuthorizations(){
           <div class="authRow">
             <div class="miniAvatar">✓</div>
             <div class="rowMain">
-              <b>Sin autorizaciones cargadas</b>
-              <span>La conexión de autorizaciones se hará en el siguiente módulo.</span>
+              <b>Sin autorizaciones pendientes</b>
+              <span>No hay vehículos esperando revisión.</span>
             </div>
             <div></div>
             <span class="statusBadge status-finalizado">0</span>
@@ -503,7 +575,7 @@ function renderAuthorizations(){
             <div class="miniAvatar">${escaparHtml(a.initials)}</div>
             <h3>${escaparHtml(a.name)}</h3>
             <p>${escaparHtml(a.detail)}</p>
-            <p><b>Tipo:</b> ${escaparHtml(a.type)}<br><b>Solicitud:</b> ${escaparHtml(a.time)}</p>
+            <p><b>Membresía:</b> ${escaparHtml(a.membership || "Sin número")}<br><b>Tipo:</b> ${escaparHtml(a.type)}<br><b>Solicitud:</b> ${escaparHtml(a.time)}</p>
             <div class="cardActions">
               <button class="approve" onclick="approveAuth(${i})">Aprobar</button>
               <button class="reject" onclick="rejectAuth(${i})">Rechazar</button>
@@ -514,8 +586,8 @@ function renderAuthorizations(){
       : `
           <article class="authCard">
             <div class="miniAvatar">✓</div>
-            <h3>Sin autorizaciones conectadas</h3>
-            <p>Este módulo se conectará después a las solicitudes de autorización de vehículos.</p>
+            <h3>Sin autorizaciones pendientes</h3>
+            <p>No hay vehículos esperando revisión.</p>
           </article>
         `;
   }
@@ -969,23 +1041,118 @@ window.openAuth = i => {
   const a = state.authorizations[i];
   if (!a) return;
 
+  const v = a.raw || {};
+
   openModal(
     "Expediente de autorización",
     `
       <p><b>${escaparHtml(a.name)}</b></p>
-      <p>${escaparHtml(a.detail)}</p>
-      <p>${escaparHtml(a.type)} · ${escaparHtml(a.time)}</p>
+      <p><b>Vehículo:</b> ${escaparHtml(v.marca || "")} ${escaparHtml(v.subMarca || "")}</p>
+      <p><b>Placas:</b> ${escaparHtml(v.placas || "Sin placas")}</p>
+      <p><b>Serie:</b> ${escaparHtml(v.serie || "Sin serie")}</p>
+      <p><b>Color:</b> ${escaparHtml(v.color || "Sin color")}</p>
+      <p><b>Membresía solicitada:</b> ${escaparHtml(a.membership || "Sin número")}</p>
+      <p><b>Solicitud:</b> ${escaparHtml(a.time)}</p>
+      <div class="cardActions">
+        <button class="approve" onclick="approveAuth(${i})">Aprobar</button>
+        <button class="reject" onclick="rejectAuth(${i})">Rechazar</button>
+      </div>
     `
   );
 };
 
-/*
-  Las autorizaciones reales todavía NO se modifican desde este archivo.
-  Se deja la interfaz preparada para conectarla después de revisar
-  las reglas de seguridad de Firestore.
-*/
-window.approveAuth = () => {};
-window.rejectAuth = () => {};
+async function actualizarVehiculoPrincipalSiCoincide(a,cambios){
+  if (!a?.uidCliente || !a?.vehicleId) return;
+
+  const usuarioRef = firestoreDoc(db,"usuarios",a.uidCliente);
+  const usuarioSnap = await firestoreGetDoc(usuarioRef);
+
+  if (!usuarioSnap.exists()) return;
+
+  const usuario = usuarioSnap.data();
+  const principalId = usuario.vehiculoPrincipal?.id || "";
+
+  if (principalId !== a.vehicleId) return;
+
+  await firestoreUpdateDoc(usuarioRef,{
+    "vehiculoPrincipal.membresiaAplicada": cambios.membresiaAplicada,
+    "vehiculoPrincipal.estadoMembresiaVehiculo": cambios.estadoMembresiaVehiculo,
+    "vehiculoPrincipal.requiereAutorizacion": cambios.requiereAutorizacion,
+    actualizadoEn: firestoreServerTimestamp()
+  });
+}
+
+window.approveAuth = async i => {
+  const a = state.authorizations[i];
+  if (!a || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  try {
+    const vehiculoRef = firestoreDoc(
+      db,
+      "usuarios",
+      a.uidCliente,
+      "vehiculos",
+      a.vehicleId
+    );
+
+    const cambios = {
+      membresiaAplicada: true,
+      estadoMembresiaVehiculo: "activo",
+      requiereAutorizacion: false,
+      autorizacionEstado: "aprobada",
+      autorizacionAprobadaEn: firestoreServerTimestamp(),
+      actualizadoEn: firestoreServerTimestamp()
+    };
+
+    await firestoreUpdateDoc(vehiculoRef,cambios);
+    await actualizarVehiculoPrincipalSiCoincide(a,cambios);
+
+    closeModal();
+  } catch (error) {
+    console.error("Error aprobando autorización:",error);
+
+    openModal(
+      "No fue posible aprobar",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.rejectAuth = async i => {
+  const a = state.authorizations[i];
+  if (!a || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  try {
+    const vehiculoRef = firestoreDoc(
+      db,
+      "usuarios",
+      a.uidCliente,
+      "vehiculos",
+      a.vehicleId
+    );
+
+    const cambios = {
+      membresiaAplicada: false,
+      estadoMembresiaVehiculo: "sin_membresia",
+      requiereAutorizacion: false,
+      autorizacionEstado: "rechazada",
+      autorizacionRechazadaEn: firestoreServerTimestamp(),
+      actualizadoEn: firestoreServerTimestamp()
+    };
+
+    await firestoreUpdateDoc(vehiculoRef,cambios);
+    await actualizarVehiculoPrincipalSiCoincide(a,cambios);
+
+    closeModal();
+  } catch (error) {
+    console.error("Error rechazando autorización:",error);
+
+    openModal(
+      "No fue posible rechazar",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
 
 document
   .getElementById("menuBtn")
@@ -1061,6 +1228,11 @@ async function iniciarFirebaseAdmin(){
     db = firebaseConfigModule.db;
     firestoreCollection = firestoreModule.collection;
     firestoreOnSnapshot = firestoreModule.onSnapshot;
+    firestoreCollectionGroup = firestoreModule.collectionGroup;
+    firestoreDoc = firestoreModule.doc;
+    firestoreGetDoc = firestoreModule.getDoc;
+    firestoreUpdateDoc = firestoreModule.updateDoc;
+    firestoreServerTimestamp = firestoreModule.serverTimestamp;
 
     if (!db) {
       throw new Error("firebase-config.js no exporta db.");
@@ -1071,6 +1243,7 @@ async function iniciarFirebaseAdmin(){
     escucharClientes();
     escucharProveedores();
     escucharServicios();
+    escucharVehiculos();
   } catch (error) {
     console.error("No fue posible iniciar Firebase en Admin:",error);
 
@@ -1094,6 +1267,7 @@ function escucharClientes(){
     firestoreCollection(db,"usuarios"),
     snapshot => {
       state.clients = snapshot.docs.map(convertirCliente);
+      reconstruirAutorizaciones();
       actualizarInterfazFirebase();
     },
     error => {
@@ -1119,6 +1293,47 @@ function escucharProveedores(){
   );
 }
 
+
+function escucharVehiculos(){
+  if (!firebaseReady || !firestoreCollectionGroup) return;
+
+  unsubscribeVehicles?.();
+
+  unsubscribeVehicles = firestoreOnSnapshot(
+    firestoreCollectionGroup(db,"vehiculos"),
+    snapshot => {
+      state.vehicles = snapshot.docs.map(documento => {
+        const datos = documento.data();
+        const uidCliente = documento.ref.parent.parent?.id || "";
+
+        return {
+          id: documento.id,
+          uidCliente,
+          path: documento.ref.path,
+          marca: datos.marca || "",
+          subMarca: datos.subMarca || "",
+          color: datos.color || "",
+          placas: datos.placas || "",
+          serie: datos.serie || "",
+          membresiaAplicada: datos.membresiaAplicada === true,
+          estadoMembresiaVehiculo: datos.estadoMembresiaVehiculo || "",
+          requiereAutorizacion: datos.requiereAutorizacion === true,
+          numeroMembresiaSolicitada: datos.numeroMembresiaSolicitada || "",
+          solicitudMembresiaEn: datos.solicitudMembresiaEn || null,
+          creadoEn: datos.creadoEn || null,
+          raw: datos
+        };
+      });
+
+      reconstruirAutorizaciones();
+      actualizarInterfazFirebase();
+    },
+    error => {
+      console.error("Error leyendo vehículos:",error);
+    }
+  );
+}
+
 function escucharServicios(){
   if (!firebaseReady) return;
 
@@ -1140,6 +1355,7 @@ window.addEventListener("beforeunload",() => {
   unsubscribeServices?.();
   unsubscribeProviders?.();
   unsubscribeClients?.();
+  unsubscribeVehicles?.();
 });
 
 renderKpis();
