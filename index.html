@@ -1,286 +1,584 @@
+
 <!DOCTYPE html>
+
 <html lang="es">
+
 <head>
+
   <meta charset="UTF-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>AS CLICK | Panel Administrativo</title>
+
   <meta name="theme-color" content="#08111f">
+
   <link rel="preconnect" href="https://unpkg.com">
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
   <link rel="stylesheet" href="./styles.css">
+
 </head>
+
 <body>
+
   <div class="appShell">
+
     <aside class="sidebar" id="sidebar">
+
       <div class="brand">
+
         <div class="brandMark">↗</div>
+
         <div>
+
           <div class="brandTitle"><span>AS</span> CLICK</div>
+
           <div class="brandSub">PANEL ADMINISTRATIVO</div>
+
         </div>
+
       </div>
+
+ 
 
       <nav class="sideNav">
+
         <button class="navItem active" data-section="inicio"><span>⌂</span><b>Inicio</b></button>
+
         <button class="navItem" data-section="servicios"><span>▣</span><b>Servicios</b><i>›</i></button>
+
+        <button class="navItem" data-section="cotizaciones"><span>＄</span><b>Cotizaciones grúa</b><i>›</i></button>
+
         <button class="navItem" data-section="mapa"><span>⌖</span><b>Mapa en vivo</b><i>›</i></button>
+
         <button class="navItem" data-section="autorizaciones"><span>△</span><b>Autorizaciones</b><em id="authBadge">7</em><i>›</i></button>
+
         <button class="navItem" data-section="clientes"><span>♙</span><b>Clientes</b><i>›</i></button>
+
         <button class="navItem" data-section="vehiculos"><span>▰</span><b>Vehículos</b><i>›</i></button>
+
         <button class="navItem" data-section="membresias"><span>▤</span><b>Membresías</b><i>›</i></button>
+
         <button class="navItem" data-section="proveedores"><span>▧</span><b>Proveedores</b><i>›</i></button>
+
         <button class="navItem" data-section="gremios"><span>◈</span><b>MONTEC / ACME</b><i>›</i></button>
+
         <button class="navItem" data-section="pagos"><span>▱</span><b>Pagos</b><i>›</i></button>
+
         <button class="navItem" data-section="incidencias"><span>△</span><b>Incidencias</b><i>›</i></button>
+
         <button class="navItem" data-section="reportes"><span>☑</span><b>Reportes</b><i>›</i></button>
+
         <button class="navItem" data-section="auditoria"><span>◇</span><b>Auditoría</b><i>›</i></button>
+
         <button class="navItem" data-section="administradores"><span>♙</span><b>Administradores</b><i>›</i></button>
+
         <button class="navItem" data-section="configuracion"><span>⚙</span><b>Configuración</b><i>›</i></button>
+
         <button class="navItem" data-section="ayuda"><span>?</span><b>Ayuda</b></button>
+
       </nav>
 
+ 
+
       <div class="cabinaCard">
+
         <div class="cabinaTitle">🎧 Cabina AS CLICK</div>
+
         <div class="cabinaPhone">☎ 55 1975 0497</div>
+
         <div class="cabinaStatus"><span></span>En línea</div>
+
       </div>
+
     </aside>
 
+ 
+
     <main class="mainArea">
+
       <header class="topbar">
+
         <div class="topbarLeft">
+
           <button class="menuBtn" id="menuBtn">☰</button>
+
           <div>
+
             <h1 id="pageTitle">Dashboard</h1>
+
             <p id="pageSubtitle">Bienvenido, Administrador</p>
+
           </div>
+
         </div>
+
+ 
 
         <div class="topbarRight">
+
           <label class="searchBox">
+
             <input id="globalSearch" type="search" placeholder="Buscar...">
+
             <span>⌕</span>
+
           </label>
+
           <button class="iconBtn" title="Notificaciones">♢<small>12</small></button>
+
           <div class="adminUser">
+
             <div class="avatar">A</div>
+
             <div>
+
               <b>Administrador</b>
+
               <span>Superadmin</span>
+
             </div>
+
           </div>
+
         </div>
+
       </header>
 
+ 
+
       <section class="pageSection active" id="section-inicio">
+
         <div class="toolbar">
+
           <div></div>
+
           <div class="toolbarActions">
+
             <button class="dateBtn">▣ <span id="todayLabel"></span></button>
+
             <button class="refreshBtn" id="refreshBtn">↻ Actualizar</button>
+
           </div>
+
         </div>
+
+ 
 
         <section class="kpiGrid kpiGridTop" id="kpiTop"></section>
+
         <section class="kpiGrid kpiGridBottom" id="kpiBottom"></section>
 
+ 
+
         <section class="mainGrid">
+
           <article class="panel servicesPanel">
+
             <div class="panelHeader">
+
               <h2>Servicios recientes</h2>
+
               <button data-section-link="servicios">Ver todos</button>
+
             </div>
+
             <div class="tableWrap">
+
               <table>
+
                 <thead>
+
                   <tr><th>Folio</th><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Hora</th></tr>
+
                 </thead>
+
                 <tbody id="recentServicesBody"></tbody>
+
               </table>
+
             </div>
+
             <div class="panelFooter"><button data-section-link="servicios">Ver todos →</button></div>
+
           </article>
+
+ 
 
           <article class="panel mapPanel">
+
             <div class="panelHeader">
+
               <h2>Mapa en vivo</h2>
+
               <button data-section-link="mapa">↻ Ingr mapa completo</button>
+
             </div>
+
             <div id="liveMap"></div>
+
             <div class="mapLegend">
+
               <span><i class="legendDot client"></i>Cliente</span>
+
               <span><i class="legendDot adjuster"></i>Ajustador</span>
+
               <span><i class="legendDot lawyer"></i>Abogado</span>
+
               <span><i class="legendDot roadside"></i>Auxilio Vial</span>
+
               <span><i class="legendDot tow"></i>Grúa</span>
+
               <span><i class="legendRing"></i>Servicio activo</span>
+
             </div>
+
           </article>
+
         </section>
+
+ 
 
         <section class="bottomGrid">
-          <article class="panel">
-            <div class="panelHeader">
-              <h2>Autorizaciones pendientes</h2>
-              <button data-section-link="autorizaciones">Ver todas</button>
-            </div>
-            <div id="pendingAuthorizations"></div>
-            <div class="panelFooter"><button data-section-link="autorizaciones">Ver todas →</button></div>
-          </article>
 
           <article class="panel">
+
             <div class="panelHeader">
-              <h2>Proveedores destacados</h2>
-              <button data-section-link="proveedores">Ver todos</button>
+
+              <h2>Autorizaciones pendientes</h2>
+
+              <button data-section-link="autorizaciones">Ver todas</button>
+
             </div>
-            <div id="featuredProviders"></div>
+
+            <div id="pendingAuthorizations"></div>
+
+            <div class="panelFooter"><button data-section-link="autorizaciones">Ver todas →</button></div>
+
           </article>
+
+ 
+
+          <article class="panel">
+
+            <div class="panelHeader">
+
+              <h2>Proveedores destacados</h2>
+
+              <button data-section-link="proveedores">Ver todos</button>
+
+            </div>
+
+            <div id="featuredProviders"></div>
+
+          </article>
+
+ 
 
           <article class="panel chartPanel">
+
             <div class="panelHeader">
+
               <h2>Ingresos (últimos 7 días)</h2>
+
               <strong>Total: $168,750.00</strong>
+
             </div>
+
             <canvas id="incomeChart" width="620" height="300"></canvas>
+
           </article>
+
         </section>
+
       </section>
+
+ 
 
       <section class="pageSection" id="section-servicios">
+
         <div class="contentHeader"><h2>Servicios</h2><button class="primaryBtn" id="newServiceBtn">+ Crear servicio manual</button></div>
+
         <div class="panel"><div class="filters">
+
           <input id="serviceSearch" placeholder="Buscar folio, cliente, placas...">
+
           <select id="serviceStatusFilter"><option value="">Todos los estados</option><option>Pendiente</option><option>Asignado</option><option>En camino</option><option>En sitio</option><option>Finalizado</option><option>Cancelado</option></select>
+
           <select id="serviceTypeFilter"><option value="">Todos los servicios</option><option>Ajustador</option><option>Abogado</option><option>Auxilio Vial</option><option>Grúa</option></select>
+
         </div><div class="tableWrap"><table><thead><tr><th>Folio</th><th>Cliente</th><th>Servicio</th><th>Proveedor</th><th>Estado</th><th>Hora</th><th></th></tr></thead><tbody id="allServicesBody"></tbody></table></div></div>
+
       </section>
+
+ 
+
+      <section class="pageSection" id="section-cotizaciones">
+
+        <div class="contentHeader"><div><h2>Cotizaciones de grúa</h2><p>Solicitudes en cotización, propuestas recibidas y cotizaciones autorizadas.</p></div></div>
+
+        <div class="panel"><div class="tableWrap"><table><thead><tr><th>Folio</th><th>Cliente</th><th>Categoría</th><th>Condición</th><th>Carga</th><th>Cotizaciones</th><th>Estado</th><th></th></tr></thead><tbody id="towQuotesBody"></tbody></table></div></div>
+
+      </section>
+
+ 
 
       <section class="pageSection" id="section-autorizaciones">
+
         <div class="contentHeader"><div><h2>Autorizaciones</h2><p>Solicitudes pendientes de revisión.</p></div></div>
+
         <div class="cardsList" id="authorizationCards"></div>
+
       </section>
+
+ 
 
       <section class="pageSection" id="section-clientes">
+
         <div class="contentHeader"><h2>Clientes</h2><button class="primaryBtn">+ Nuevo cliente</button></div>
+
         <div class="panel"><div class="tableWrap"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Membresía</th><th>Vehículos</th><th>Servicios</th><th>Estado</th></tr></thead><tbody id="clientsBody"></tbody></table></div></div>
+
       </section>
+
+ 
 
       <section class="pageSection" id="section-proveedores">
+
         <div class="contentHeader"><h2>Proveedores</h2><button class="primaryBtn">+ Alta de proveedor</button></div>
+
         <div class="providerGrid" id="providersGrid"></div>
+
       </section>
+
+ 
 
       <section class="pageSection" id="section-mapa">
+
         <div class="contentHeader"><h2>Mapa operativo en vivo</h2></div>
+
         <div class="panel"><div id="fullMap"></div></div>
+
       </section>
+
+ 
 
       <section class="pageSection" id="section-vehiculos">
+
         <div class="contentHeader">
+
           <div>
+
             <h2>Vehículos</h2>
+
             <p>Control de vehículos, membresía aplicada y autorizaciones.</p>
+
           </div>
+
         </div>
+
+ 
 
         <div class="panel">
+
           <div class="filters">
+
             <input id="vehicleSearch" type="search" placeholder="Buscar cliente, placas, VIN o membresía">
+
             <select id="vehicleStatusFilter">
+
               <option value="">Todos los estados</option>
+
               <option value="activo">Activo</option>
+
               <option value="pendiente_autorizacion">Pendiente de autorización</option>
+
               <option value="sin_membresia">Sin membresía</option>
+
               <option value="rechazado">Rechazado</option>
+
             </select>
+
           </div>
 
+ 
+
           <div class="tableWrap">
+
             <table>
+
               <thead>
+
                 <tr>
+
                   <th>Cliente</th>
+
                   <th>Vehículo</th>
+
                   <th>Placas</th>
+
                   <th>VIN / Serie</th>
+
                   <th>Membresía</th>
+
                   <th>Estado</th>
+
                   <th>Acciones</th>
+
                 </tr>
+
               </thead>
+
               <tbody id="vehiclesBody"></tbody>
+
             </table>
+
           </div>
+
         </div>
+
       </section>
+
       <section class="pageSection" id="section-membresias">
+
         <div class="contentHeader">
+
           <div>
+
             <h2>Membresías</h2>
+
             <p>Altas, renovaciones, vigencias, suspensiones y cancelaciones.</p>
+
           </div>
+
           <button class="primaryButton" id="generateMembershipBtn">+ Generar membresías</button>
+
         </div>
+
+ 
 
         <div class="kpiGrid" id="membershipKpis"></div>
 
+ 
+
         <div class="panel">
+
           <div class="filters">
+
             <input id="membershipSearch" type="search" placeholder="Buscar número, cliente, teléfono o correo">
+
             <select id="membershipStatusFilter">
+
               <option value="">Todos los estados</option>
+
               <option value="pendiente_activacion">Disponibles</option>
+
               <option value="activa">Activas</option>
+
               <option value="vence_pronto">Vencen pronto</option>
+
               <option value="vencida">Vencidas</option>
+
               <option value="suspendida">Suspendidas</option>
+
               <option value="cancelada">Canceladas</option>
+
             </select>
+
           </div>
 
+ 
+
           <div class="tableWrap">
+
             <table>
+
               <thead>
+
                 <tr>
+
                   <th>Número</th>
+
                   <th>Cliente</th>
+
                   <th>Teléfono</th>
+
                   <th>Plan</th>
+
                   <th>Tipo</th>
+
                   <th>Estado</th>
+
                   <th>Inicio</th>
+
                   <th>Vence</th>
+
                   <th>Días</th>
+
                   <th>Acción</th>
+
                 </tr>
+
               </thead>
+
               <tbody id="membershipsBody"></tbody>
+
             </table>
+
           </div>
+
         </div>
+
       </section>
+
       <section class="pageSection placeholder" id="section-gremios"><h2>MONTEC / ACME</h2><p>Validación de afiliaciones y números de estampa.</p></section>
+
       <section class="pageSection placeholder" id="section-pagos"><h2>Pagos</h2><p>Ingresos, costos de proveedor, comisión y utilidad.</p></section>
+
       <section class="pageSection placeholder" id="section-incidencias"><h2>Incidencias</h2><p>Quejas, problemas operativos, evidencias y resolución.</p></section>
+
       <section class="pageSection placeholder" id="section-reportes"><h2>Reportes</h2><p>Estadísticas de servicios, tiempos, proveedores e ingresos.</p></section>
+
       <section class="pageSection placeholder" id="section-auditoria"><h2>Auditoría</h2><p>Registro de cambios realizados por administradores, proveedores y clientes.</p></section>
+
       <section class="pageSection placeholder" id="section-administradores"><h2>Administradores</h2><p>Usuarios internos, roles y permisos.</p></section>
+
       <section class="pageSection placeholder" id="section-configuracion"><h2>Configuración</h2><p>Tarifas, radios de búsqueda, teléfonos, municipios y reglas operativas.</p></section>
+
       <section class="pageSection placeholder" id="section-ayuda"><h2>Ayuda</h2><p>Documentación operativa y soporte de cabina.</p></section>
+
     </main>
+
   </div>
+
+ 
 
   <div class="mobileOverlay" id="mobileOverlay"></div>
 
+ 
+
   <div class="modalOverlay" id="modalOverlay" hidden>
+
     <div class="modal">
+
       <button class="modalClose" id="modalClose">×</button>
+
       <h3 id="modalTitle">Detalle</h3>
+
       <div id="modalContent"></div>
+
     </div>
+
   </div>
 
+ 
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script src="./app.js"></script>
+
 </body>
+
 </html>
