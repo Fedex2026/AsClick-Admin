@@ -19,7 +19,8 @@ let firestoreServerTimestamp = null;
 let unsubscribeServices = null;
 let unsubscribeProviders = null;
 let unsubscribeClients = null;
-let unsubscribeVehicles = null;
+let unsubscribeVehicles = [];
+const vehicleSnapshotsByUser = new Map();
 
 const kpiTopData = [
   ["Pendientes","0","◷","pending"],
@@ -2231,7 +2232,6 @@ async function iniciarFirebaseAdmin(){
     escucharClientes();
     escucharProveedores();
     escucharServicios();
-    escucharVehiculos();
   } catch (error) {
     console.error("No fue posible iniciar Firebase en Admin:",error);
 
@@ -2255,6 +2255,7 @@ function escucharClientes(){
     firestoreCollection(db,"usuarios"),
     snapshot => {
       state.clients = snapshot.docs.map(convertirCliente);
+      escucharVehiculosPorUsuarios();
       reconstruirAutorizaciones();
       actualizarInterfazFirebase();
     },
@@ -2282,44 +2283,91 @@ function escucharProveedores(){
 }
 
 
-function escucharVehiculos(){
-  if (!firebaseReady || !firestoreCollectionGroup) return;
+function recombinarVehiculosDesdeUsuarios(){
+  state.vehicles = [...vehicleSnapshotsByUser.values()]
+    .flat()
+    .sort((a,b) =>
+      obtenerMilisegundos(b.creadoEn) - obtenerMilisegundos(a.creadoEn)
+    );
 
-  unsubscribeVehicles?.();
+  reconstruirAutorizaciones();
+  actualizarInterfazFirebase();
+}
 
-  unsubscribeVehicles = firestoreOnSnapshot(
-    firestoreCollectionGroup(db,"vehiculos"),
-    snapshot => {
-      state.vehicles = snapshot.docs.map(documento => {
-        const datos = documento.data();
-        const uidCliente = documento.ref.parent.parent?.id || "";
-
-        return {
-          id: documento.id,
-          uidCliente,
-          path: documento.ref.path,
-          marca: datos.marca || "",
-          subMarca: datos.subMarca || "",
-          color: datos.color || "",
-          placas: datos.placas || "",
-          serie: datos.serie || "",
-          membresiaAplicada: datos.membresiaAplicada === true,
-          estadoMembresiaVehiculo: datos.estadoMembresiaVehiculo || "",
-          requiereAutorizacion: datos.requiereAutorizacion === true,
-          numeroMembresiaSolicitada: datos.numeroMembresiaSolicitada || "",
-          solicitudMembresiaEn: datos.solicitudMembresiaEn || null,
-          creadoEn: datos.creadoEn || null,
-          raw: datos
-        };
-      });
-
-      reconstruirAutorizaciones();
-      actualizarInterfazFirebase();
-    },
-    error => {
-      console.error("Error leyendo vehículos:",error);
+function detenerListenersVehiculos(){
+  unsubscribeVehicles.forEach(unsub => {
+    try {
+      unsub?.();
+    } catch (error) {
+      console.warn("No fue posible cerrar un listener de vehículos:",error);
     }
-  );
+  });
+
+  unsubscribeVehicles = [];
+  vehicleSnapshotsByUser.clear();
+}
+
+function escucharVehiculosPorUsuarios(){
+  if (!firebaseReady || !state.clients.length) {
+    state.vehicles = [];
+    renderVehicles();
+    return;
+  }
+
+  detenerListenersVehiculos();
+
+  state.clients.forEach(cliente => {
+    const referenciaVehiculos = firestoreCollection(
+      db,
+      "usuarios",
+      cliente.id,
+      "vehiculos"
+    );
+
+    const unsubscribe = firestoreOnSnapshot(
+      referenciaVehiculos,
+      snapshot => {
+        const vehiculosCliente = snapshot.docs.map(documento => {
+          const datos = documento.data();
+
+          return {
+            id: documento.id,
+            uidCliente: cliente.id,
+            path: documento.ref.path,
+            marca: datos.marca || "",
+            subMarca: datos.subMarca || "",
+            color: datos.color || "",
+            placas: datos.placas || "",
+            serie: datos.serie || "",
+            membresiaAplicada: datos.membresiaAplicada === true,
+            estadoMembresiaVehiculo:
+              datos.estadoMembresiaVehiculo ||
+              (datos.membresiaAplicada === true ? "activo" : "sin_membresia"),
+            requiereAutorizacion: datos.requiereAutorizacion === true,
+            numeroMembresiaSolicitada: datos.numeroMembresiaSolicitada || "",
+            solicitudMembresiaEn: datos.solicitudMembresiaEn || null,
+            creadoEn: datos.creadoEn || null,
+            raw: datos
+          };
+        });
+
+        vehicleSnapshotsByUser.set(
+          cliente.id,
+          vehiculosCliente
+        );
+
+        recombinarVehiculosDesdeUsuarios();
+      },
+      error => {
+        console.error(
+          `Error leyendo vehículos de ${cliente.id}:`,
+          error
+        );
+      }
+    );
+
+    unsubscribeVehicles.push(unsubscribe);
+  });
 }
 
 function escucharServicios(){
@@ -2343,7 +2391,7 @@ window.addEventListener("beforeunload",() => {
   unsubscribeServices?.();
   unsubscribeProviders?.();
   unsubscribeClients?.();
-  unsubscribeVehicles?.();
+  detenerListenersVehiculos();
 });
 
 renderKpis();
