@@ -3,7 +3,8 @@ const state = {
   authorizations: [],
   providers: [],
   clients: [],
-  vehicles: []
+  vehicles: [],
+  memberships: []
 };
 
 let firebaseReady = false;
@@ -15,6 +16,9 @@ let firestoreDoc = null;
 let firestoreGetDoc = null;
 let firestoreUpdateDoc = null;
 let firestoreServerTimestamp = null;
+let firestoreSetDoc = null;
+let firestoreWriteBatch = null;
+let firestoreTimestamp = null;
 
 let unsubscribeServices = null;
 let unsubscribeProviders = null;
@@ -2198,6 +2202,10 @@ document
   });
 
 document
+  .getElementById("generateMembershipBtn")
+  ?.addEventListener("click",abrirGeneradorMembresias);
+
+document
   .getElementById("newServiceBtn")
   .addEventListener("click",() =>
     openModal(
@@ -2213,6 +2221,7 @@ function actualizarInterfazFirebase(){
   renderClients();
   renderVehicles();
   renderMemberships();
+  renderMembershipKpis();
   renderAuthorizations();
   drawIncomeChart();
 }
@@ -2233,6 +2242,9 @@ async function iniciarFirebaseAdmin(){
     firestoreGetDoc = firestoreModule.getDoc;
     firestoreUpdateDoc = firestoreModule.updateDoc;
     firestoreServerTimestamp = firestoreModule.serverTimestamp;
+    firestoreSetDoc = firestoreModule.setDoc;
+    firestoreWriteBatch = firestoreModule.writeBatch;
+    firestoreTimestamp = firestoreModule.Timestamp;
 
     if (!db) {
       throw new Error("firebase-config.js no exporta db.");
@@ -2394,12 +2406,50 @@ function combinarVehiculosRaizYSubcolecciones(vehiculosSubcoleccion){
   return resultado;
 }
 
-function normalizarEstadoMembresiaCliente(cliente){
-  const datos = cliente?.raw || {};
-  const estado = String(
-    datos.estadoMembresia ||
-    datos.membresia?.estado ||
-    (cliente?.hasMembership ? "activa" : "sin_membresia")
+function fechaDesdeFirestore(valor){
+  if (!valor) return null;
+
+  if (typeof valor?.toDate === "function") {
+    return valor.toDate();
+  }
+
+  if (typeof valor?.seconds === "number") {
+    return new Date(valor.seconds * 1000);
+  }
+
+  const fecha = new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+function formatearFechaMembresia(valor){
+  const fecha = fechaDesdeFirestore(valor);
+  if (!fecha) return "—";
+
+  return fecha.toLocaleDateString("es-MX",{
+    day:"2-digit",
+    month:"2-digit",
+    year:"numeric"
+  });
+}
+
+function diasRestantesMembresia(valor){
+  const fecha = fechaDesdeFirestore(valor);
+  if (!fecha) return null;
+
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+
+  const fin = new Date(fecha);
+  fin.setHours(0,0,0,0);
+
+  return Math.ceil((fin.getTime() - hoy.getTime()) / 86400000);
+}
+
+function normalizarEstadoMembresiaAdmin(membresia = {}){
+  const raw = String(
+    membresia.estadoMembresia ||
+    membresia.estado ||
+    ""
   )
     .trim()
     .toLowerCase()
@@ -2407,31 +2457,115 @@ function normalizarEstadoMembresiaCliente(cliente){
     .replace(/[\u0300-\u036f]/g,"")
     .replace(/\s+/g,"_");
 
-  if (["activa","activo"].includes(estado)) return "activa";
-  if (["pendiente","pendiente_autorizacion"].includes(estado)) return "pendiente";
-  if (["vencida","vencido"].includes(estado)) return "vencida";
-  if (["suspendida","suspendido","cancelada","cancelado"].includes(estado)) return "suspendida";
+  const uid = String(membresia.uidUsuario || "").trim();
 
-  return cliente?.hasMembership ? "activa" : "sin_membresia";
+  if (
+    ["cancelada","cancelado"].includes(raw)
+  ) return "cancelada";
+
+  if (
+    ["suspendida","suspendido"].includes(raw)
+  ) return "suspendida";
+
+  const fin =
+    membresia.fechaFin ||
+    membresia.finVigencia ||
+    membresia.vigencia ||
+    null;
+
+  const dias = diasRestantesMembresia(fin);
+
+  if (uid && dias != null && dias < 0) {
+    return "vencida";
+  }
+
+  if (uid && dias != null && dias <= 30) {
+    return "vence_pronto";
+  }
+
+  if (
+    !uid ||
+    [
+      "pendiente_activacion",
+      "disponible",
+      "pendiente",
+      ""
+    ].includes(raw)
+  ) {
+    return "pendiente_activacion";
+  }
+
+  if (
+    [
+      "activa",
+      "activo",
+      "asignada",
+      "asignado",
+      "vigente"
+    ].includes(raw)
+  ) {
+    return "activa";
+  }
+
+  return uid ? "activa" : "pendiente_activacion";
 }
 
-function textoEstadoMembresiaCliente(estado){
+function textoEstadoMembresiaAdmin(estado){
   const mapa = {
+    pendiente_activacion: "Disponible",
     activa: "Activa",
-    pendiente: "Pendiente",
+    vence_pronto: "Vence pronto",
     vencida: "Vencida",
     suspendida: "Suspendida",
-    sin_membresia: "Sin membresía"
+    cancelada: "Cancelada"
   };
 
-  return mapa[estado] || "Sin membresía";
+  return mapa[estado] || estado;
 }
 
-function claseEstadoMembresiaCliente(estado){
+function claseEstadoMembresiaAdmin(estado){
   if (estado === "activa") return "status-disponible";
-  if (estado === "pendiente") return "status-pendiente";
-  if (estado === "vencida" || estado === "suspendida") return "status-cancelado";
+  if (estado === "pendiente_activacion") return "status-asignado";
+  if (estado === "vence_pronto") return "status-pendiente";
+  if (["vencida","suspendida","cancelada"].includes(estado)) {
+    return "status-cancelado";
+  }
   return "status-finalizado";
+}
+
+function obtenerClienteDeMembresia(membresia){
+  const uid = String(membresia.uidUsuario || "").trim();
+  if (!uid) return null;
+
+  return state.clients.find(c => c.id === uid) || null;
+}
+
+function renderMembershipKpis(){
+  const contenedor = document.getElementById("membershipKpis");
+  if (!contenedor) return;
+
+  const estados = state.memberships.map(normalizarEstadoMembresiaAdmin);
+
+  const disponibles = estados.filter(e => e === "pendiente_activacion").length;
+  const activas = estados.filter(e => e === "activa").length;
+  const vencen = estados.filter(e => e === "vence_pronto").length;
+  const vencidas = estados.filter(e => e === "vencida").length;
+
+  const datos = [
+    ["Disponibles",String(disponibles),"▣","assigned"],
+    ["Activas",String(activas),"✓","done"],
+    ["Vencen ≤ 30 días",String(vencen),"◷","pending"],
+    ["Vencidas",String(vencidas),"×","cancelled"]
+  ];
+
+  contenedor.innerHTML = datos.map(([label,value,icon,cls]) => `
+    <article class="kpi ${cls}">
+      <div class="label">${escaparHtml(label)}</div>
+      <div class="value">${escaparHtml(value)}</div>
+      <div class="sub">Membresías</div>
+      <div class="icon">${icon}</div>
+    </article>
+  `).join("");
 }
 
 function renderMemberships(){
@@ -2445,40 +2579,65 @@ function renderMemberships(){
   const filtro =
     document.getElementById("membershipStatusFilter")?.value || "";
 
-  const filas = state.clients
-    .map(cliente => {
-      const datos = cliente.raw || {};
-      const estado = normalizarEstadoMembresiaCliente(cliente);
+  const filas = state.memberships
+    .map(m => {
+      const cliente = obtenerClienteDeMembresia(m);
+      const estado = normalizarEstadoMembresiaAdmin(m);
 
-      const numero =
-        datos.numeroMiembro ||
-        datos.numeroMembresia ||
-        datos.numeroSocio ||
-        (cliente.hasMembership ? cliente.membership : "Sin membresía");
+      const inicio =
+        m.fechaInicio ||
+        m.inicioVigencia ||
+        m.fechaVinculacion ||
+        null;
 
-      const tipo =
-        datos.tipoMembresia ||
-        datos.membresia?.tipo ||
-        datos.tipoCliente ||
-        "AS CLICK";
+      const fin =
+        m.fechaFin ||
+        m.finVigencia ||
+        m.vigencia ||
+        null;
 
-      const vehiculos = state.vehicles.filter(
-        v => v.uidCliente === cliente.id
-      ).length;
+      const dias = diasRestantesMembresia(fin);
 
       return {
+        ...m,
         cliente,
         estado,
-        numero,
-        tipo,
-        vehiculos
+        inicio,
+        fin,
+        dias,
+        numero:
+          m.numeroMembresia ||
+          m.id ||
+          "",
+        nombre:
+          m.nombreRegistro ||
+          cliente?.name ||
+          "Sin asignar",
+        telefono:
+          m.telefonoRegistro ||
+          cliente?.phone ||
+          "—",
+        correo:
+          m.correo ||
+          cliente?.raw?.correo ||
+          "",
+        plan:
+          m.plan ||
+          m.tipoMembresia ||
+          "anual",
+        tipo:
+          m.tipoCliente ||
+          cliente?.raw?.tipoCliente ||
+          "—"
       };
     })
     .filter(item => {
       const textoBusqueda = [
-        item.cliente.name,
-        item.cliente.phone,
         item.numero,
+        item.nombre,
+        item.telefono,
+        item.correo,
+        item.plan,
         item.tipo
       ].join(" ").toLowerCase();
 
@@ -2488,33 +2647,347 @@ function renderMemberships(){
       );
     })
     .sort((a,b) =>
-      a.cliente.name.localeCompare(b.cliente.name,"es")
+      String(a.numero).localeCompare(String(b.numero),"es",{
+        numeric:true
+      })
     );
 
   if (!filas.length) {
     cuerpo.innerHTML = `
       <tr>
-        <td colspan="6">No hay membresías que coincidan con los filtros.</td>
+        <td colspan="10">No hay membresías que coincidan con los filtros.</td>
       </tr>
     `;
+    renderMembershipKpis();
     return;
   }
 
-  cuerpo.innerHTML = filas.map(item => `
-    <tr>
-      <td><b>${escaparHtml(item.cliente.name)}</b></td>
-      <td>${escaparHtml(item.cliente.phone)}</td>
-      <td>${escaparHtml(item.numero)}</td>
-      <td>${escaparHtml(item.tipo)}</td>
-      <td>
-        <span class="statusBadge ${claseEstadoMembresiaCliente(item.estado)}">
-          ${escaparHtml(textoEstadoMembresiaCliente(item.estado))}
-        </span>
-      </td>
-      <td>${escaparHtml(item.vehiculos)}</td>
-    </tr>
-  `).join("");
+  cuerpo.innerHTML = filas.map(item => {
+    const diasTexto =
+      item.estado === "pendiente_activacion"
+        ? "Sin activar"
+        : item.dias == null
+          ? "—"
+          : item.dias < 0
+            ? `${Math.abs(item.dias)} días vencida`
+            : item.dias === 0
+              ? "Vence hoy"
+              : `${item.dias} días`;
+
+    return `
+      <tr>
+        <td><b>${escaparHtml(item.numero)}</b></td>
+        <td>${escaparHtml(item.nombre)}</td>
+        <td>${escaparHtml(item.telefono)}</td>
+        <td>${escaparHtml(item.plan)}</td>
+        <td>${escaparHtml(item.tipo)}</td>
+        <td>
+          <span class="statusBadge ${claseEstadoMembresiaAdmin(item.estado)}">
+            ${escaparHtml(textoEstadoMembresiaAdmin(item.estado))}
+          </span>
+        </td>
+        <td>${escaparHtml(formatearFechaMembresia(item.inicio))}</td>
+        <td>${escaparHtml(formatearFechaMembresia(item.fin))}</td>
+        <td>${escaparHtml(diasTexto)}</td>
+        <td>
+          <div class="cardActions" style="margin-top:0">
+            ${
+              item.estado === "pendiente_activacion"
+                ? `<button onclick="copiarNumeroMembresia('${escaparHtml(item.numero)}')">Copiar</button>`
+                : `<button class="approve" onclick="renovarMembresia('${escaparHtml(item.id)}')">Renovar</button>`
+            }
+            ${
+              !["pendiente_activacion","cancelada"].includes(item.estado)
+                ? `<button onclick="suspenderMembresia('${escaparHtml(item.id)}')">Suspender</button>`
+                : ""
+            }
+            ${
+              item.estado !== "cancelada"
+                ? `<button class="reject" onclick="cancelarMembresia('${escaparHtml(item.id)}')">Cancelar</button>`
+                : ""
+            }
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  renderMembershipKpis();
 }
+
+function siguienteNumeroMembresia(cantidad = 1){
+  let maximo = 0;
+
+  state.memberships.forEach(m => {
+    const valores = [
+      m.id,
+      m.numeroMembresia
+    ];
+
+    valores.forEach(valor => {
+      const match = String(valor || "").match(/^ASC-(\d{6})$/i);
+      if (!match) return;
+
+      maximo = Math.max(
+        maximo,
+        Number(match[1]) || 0
+      );
+    });
+  });
+
+  return Array.from({length:cantidad},(_,i) =>
+    `ASC-${String(maximo + i + 1).padStart(6,"0")}`
+  );
+}
+
+window.abrirGeneradorMembresias = () => {
+  openModal(
+    "Generar membresías",
+    `
+      <p>Se crearán folios nuevos listos para entregar al cliente.</p>
+
+      <p>
+        <b>Cantidad</b><br>
+        <select id="membershipGenerateQuantity" style="width:100%;padding:10px;margin-top:6px;">
+          <option value="1">1 membresía</option>
+          <option value="10">10 membresías</option>
+          <option value="50">50 membresías</option>
+          <option value="100">100 membresías</option>
+        </select>
+      </p>
+
+      <p>
+        <b>Plan</b><br>
+        <select id="membershipGeneratePlan" style="width:100%;padding:10px;margin-top:6px;">
+          <option value="anual">Anual · 12 meses</option>
+        </select>
+      </p>
+
+      <p>
+        La vigencia comenzará cuando el cliente use el folio al registrarse.
+      </p>
+
+      <div class="cardActions">
+        <button class="approve" onclick="generarMembresiasAdmin()">Generar</button>
+      </div>
+    `
+  );
+};
+
+window.generarMembresiasAdmin = async () => {
+  if (!firebaseReady || !firestoreWriteBatch || !firestoreSetDoc) return;
+
+  const cantidad = Math.min(
+    100,
+    Math.max(
+      1,
+      Number(
+        document.getElementById("membershipGenerateQuantity")?.value || 1
+      )
+    )
+  );
+
+  const plan =
+    document.getElementById("membershipGeneratePlan")?.value ||
+    "anual";
+
+  const numeros = siguienteNumeroMembresia(cantidad);
+
+  try {
+    const batch = firestoreWriteBatch(db);
+
+    numeros.forEach(numero => {
+      const ref = firestoreDoc(
+        db,
+        "membresias",
+        numero
+      );
+
+      batch.set(
+        ref,
+        {
+          numeroMembresia: numero,
+          estado: "disponible",
+          estadoMembresia: "pendiente_activacion",
+          plan,
+          duracionMeses: 12,
+          uidUsuario: "",
+          nombreRegistro: "",
+          telefonoRegistro: "",
+          correo: "",
+          tipoCliente: "",
+          fechaInicio: null,
+          fechaFin: null,
+          creadoEn: firestoreServerTimestamp(),
+          creadoPorAdmin: true
+        },
+        { merge: false }
+      );
+    });
+
+    await batch.commit();
+
+    openModal(
+      "Membresías generadas",
+      `
+        <p>Se generaron <b>${numeros.length}</b> membresías correctamente.</p>
+        <p><b>Primera:</b> ${escaparHtml(numeros[0])}</p>
+        <p><b>Última:</b> ${escaparHtml(numeros[numeros.length - 1])}</p>
+        <p>Ya puedes entregar cualquiera de estos folios a un cliente.</p>
+      `
+    );
+  } catch (error) {
+    console.error("Error generando membresías:",error);
+
+    openModal(
+      "No fue posible generar",
+      `<p>Firebase rechazó la creación.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.copiarNumeroMembresia = async numero => {
+  try {
+    await navigator.clipboard.writeText(numero);
+    window.alert(`Copiado: ${numero}`);
+  } catch (_) {
+    window.prompt("Copia el número de membresía:",numero);
+  }
+};
+
+function fechaFinRenovada(membresia){
+  const finActual = fechaDesdeFirestore(
+    membresia.fechaFin ||
+    membresia.finVigencia ||
+    membresia.vigencia
+  );
+
+  const base = finActual && finActual > new Date()
+    ? new Date(finActual)
+    : new Date();
+
+  base.setFullYear(base.getFullYear() + 1);
+  return base;
+}
+
+async function actualizarUsuarioPorMembresia(membresia,cambiosUsuario){
+  const uid = String(membresia.uidUsuario || "").trim();
+  if (!uid) return;
+
+  await firestoreUpdateDoc(
+    firestoreDoc(db,"usuarios",uid),
+    {
+      ...cambiosUsuario,
+      actualizadoEn: firestoreServerTimestamp()
+    }
+  );
+}
+
+window.renovarMembresia = async id => {
+  const membresia = state.memberships.find(m => m.id === id);
+  if (!membresia) return;
+
+  const confirmar = window.confirm(
+    `¿Renovar ${membresia.numeroMembresia || id} por 12 meses?`
+  );
+  if (!confirmar) return;
+
+  const nuevaFechaFin = fechaFinRenovada(membresia);
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"membresias",id),
+      {
+        estado: "asignada",
+        estadoMembresia: "activa",
+        fechaFin: nuevaFechaFin,
+        finVigencia: nuevaFechaFin,
+        vigencia: nuevaFechaFin,
+        ultimaRenovacionEn: firestoreServerTimestamp()
+      }
+    );
+
+    await actualizarUsuarioPorMembresia(
+      membresia,
+      {
+        estadoMembresia: "activa",
+        tieneMembresia: true,
+        vigencia: nuevaFechaFin,
+        puedeUsarAlertas: true
+      }
+    );
+  } catch (error) {
+    console.error("Error renovando membresía:",error);
+    openModal(
+      "No fue posible renovar",
+      `<p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.suspenderMembresia = async id => {
+  const membresia = state.memberships.find(m => m.id === id);
+  if (!membresia) return;
+
+  if (!window.confirm(`¿Suspender ${membresia.numeroMembresia || id}?`)) return;
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"membresias",id),
+      {
+        estadoMembresia: "suspendida",
+        suspendidaEn: firestoreServerTimestamp()
+      }
+    );
+
+    await actualizarUsuarioPorMembresia(
+      membresia,
+      {
+        estadoMembresia: "suspendida",
+        puedeUsarAlertas: false
+      }
+    );
+  } catch (error) {
+    console.error("Error suspendiendo membresía:",error);
+    openModal(
+      "No fue posible suspender",
+      `<p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.cancelarMembresia = async id => {
+  const membresia = state.memberships.find(m => m.id === id);
+  if (!membresia) return;
+
+  if (!window.confirm(`¿Cancelar definitivamente ${membresia.numeroMembresia || id}?`)) return;
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"membresias",id),
+      {
+        estado: "cancelada",
+        estadoMembresia: "cancelada",
+        canceladaEn: firestoreServerTimestamp()
+      }
+    );
+
+    await actualizarUsuarioPorMembresia(
+      membresia,
+      {
+        estadoMembresia: "cancelada",
+        tieneMembresia: false,
+        puedeUsarAlertas: false
+      }
+    );
+  } catch (error) {
+    console.error("Error cancelando membresía:",error);
+    openModal(
+      "No fue posible cancelar",
+      `<p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
 
 function recombinarVehiculosDesdeUsuarios(){
   const vehiculosSubcoleccion = [...vehicleSnapshotsByUser.values()]
@@ -2605,6 +3078,27 @@ function escucharVehiculosPorUsuarios(){
 
     unsubscribeVehicles.push(unsubscribe);
   });
+}
+
+function escucharMembresias(){
+  if (!firebaseReady) return;
+
+  unsubscribeMemberships?.();
+
+  unsubscribeMemberships = firestoreOnSnapshot(
+    firestoreCollection(db,"membresias"),
+    snapshot => {
+      state.memberships = snapshot.docs.map(documento => ({
+        id: documento.id,
+        ...documento.data()
+      }));
+
+      actualizarInterfazFirebase();
+    },
+    error => {
+      console.error("Error leyendo membresías:",error);
+    }
+  );
 }
 
 function escucharServicios(){
