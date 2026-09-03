@@ -931,6 +931,397 @@ function renderClients(){
   `).join("");
 }
 
+
+function normalizarEstadoVehiculo(valor){
+  const estado = String(valor || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/\s+/g,"_");
+
+  if (estado === "activo") return "activo";
+  if (estado === "pendiente_autorizacion") return "pendiente_autorizacion";
+  if (estado === "rechazado" || estado === "rechazada") return "rechazado";
+  return "sin_membresia";
+}
+
+function textoEstadoVehiculo(estado){
+  const textos = {
+    activo: "Activo",
+    pendiente_autorizacion: "Pendiente",
+    sin_membresia: "Sin membresía",
+    rechazado: "Rechazado"
+  };
+
+  return textos[normalizarEstadoVehiculo(estado)] || "Sin membresía";
+}
+
+function claseEstadoVehiculo(estado){
+  const normalizado = normalizarEstadoVehiculo(estado);
+
+  if (normalizado === "activo") return "status-disponible";
+  if (normalizado === "pendiente_autorizacion") return "status-pendiente";
+  if (normalizado === "rechazado") return "status-cancelado";
+
+  return "status-finalizado";
+}
+
+function obtenerClienteVehiculo(vehiculo){
+  return state.clients.find(c => c.id === vehiculo.uidCliente) || null;
+}
+
+function obtenerNumeroMembresiaVehiculo(vehiculo,cliente){
+  return (
+    vehiculo.numeroMembresiaSolicitada ||
+    vehiculo.raw?.numeroMembresia ||
+    vehiculo.raw?.numeroMiembro ||
+    (
+      vehiculo.membresiaAplicada === true ||
+      normalizarEstadoVehiculo(vehiculo.estadoMembresiaVehiculo) === "activo"
+        ? cliente?.membership
+        : ""
+    ) ||
+    "Sin membresía"
+  );
+}
+
+function renderVehicles(){
+  const cuerpo = document.getElementById("vehiclesBody");
+  if (!cuerpo) return;
+
+  const busqueda = String(
+    document.getElementById("vehicleSearch")?.value || ""
+  ).trim().toLowerCase();
+
+  const filtroEstado =
+    document.getElementById("vehicleStatusFilter")?.value || "";
+
+  const filas = state.vehicles
+    .map(v => {
+      const cliente = obtenerClienteVehiculo(v);
+      const estado = normalizarEstadoVehiculo(v.estadoMembresiaVehiculo);
+      const membresia = obtenerNumeroMembresiaVehiculo(v,cliente);
+      const vehiculoTexto = [
+        v.marca,
+        v.subMarca,
+        v.raw?.modelo || v.raw?.anio || v.raw?.año || ""
+      ].filter(Boolean).join(" ");
+
+      return {
+        ...v,
+        cliente,
+        clienteNombre: cliente?.name || "Cliente",
+        estado,
+        membresia,
+        vehiculoTexto: vehiculoTexto || "Vehículo"
+      };
+    })
+    .filter(v => {
+      const textoBusqueda = [
+        v.clienteNombre,
+        v.vehiculoTexto,
+        v.placas,
+        v.serie,
+        v.membresia
+      ].join(" ").toLowerCase();
+
+      return (
+        (!busqueda || textoBusqueda.includes(busqueda)) &&
+        (!filtroEstado || v.estado === filtroEstado)
+      );
+    })
+    .sort((a,b) =>
+      a.clienteNombre.localeCompare(b.clienteNombre,"es")
+    );
+
+  if (!filas.length) {
+    cuerpo.innerHTML = `
+      <tr>
+        <td colspan="7">No hay vehículos que coincidan con los filtros.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  cuerpo.innerHTML = filas.map(v => {
+    const puedeAplicar =
+      v.estado !== "activo" &&
+      v.estado !== "pendiente_autorizacion" &&
+      v.cliente?.hasMembership === true;
+
+    return `
+      <tr>
+        <td><b>${escaparHtml(v.clienteNombre)}</b></td>
+        <td>${escaparHtml(v.vehiculoTexto)}</td>
+        <td>${escaparHtml(v.placas || "Sin placas")}</td>
+        <td>${escaparHtml(v.serie || "Sin serie")}</td>
+        <td>${escaparHtml(v.membresia)}</td>
+        <td>
+          <span class="statusBadge ${claseEstadoVehiculo(v.estado)}">
+            ${escaparHtml(textoEstadoVehiculo(v.estado))}
+          </span>
+        </td>
+        <td>
+          <div class="cardActions" style="margin-top:0">
+            <button onclick="openVehicle('${escaparHtml(v.uidCliente)}','${escaparHtml(v.id)}')">Ver ficha</button>
+            ${
+              v.estado === "pendiente_autorizacion"
+                ? `<button class="approve" onclick="aprobarVehiculoDesdeLista('${escaparHtml(v.uidCliente)}','${escaparHtml(v.id)}')">Aprobar</button>`
+                : ""
+            }
+            ${
+              v.estado === "activo"
+                ? `<button class="reject" onclick="quitarMembresiaVehiculo('${escaparHtml(v.uidCliente)}','${escaparHtml(v.id)}')">Quitar membresía</button>`
+                : ""
+            }
+            ${
+              puedeAplicar
+                ? `<button class="approve" onclick="aplicarMembresiaVehiculo('${escaparHtml(v.uidCliente)}','${escaparHtml(v.id)}')">Aplicar membresía</button>`
+                : ""
+            }
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function buscarVehiculo(uidCliente,vehiculoId){
+  return state.vehicles.find(
+    v => v.uidCliente === uidCliente && v.id === vehiculoId
+  ) || null;
+}
+
+async function sincronizarVehiculoPrincipal(uidCliente,vehiculoId,cambios){
+  const usuarioRef = firestoreDoc(db,"usuarios",uidCliente);
+  const usuarioSnap = await firestoreGetDoc(usuarioRef);
+
+  if (!usuarioSnap.exists()) return;
+
+  const usuario = usuarioSnap.data();
+  const principalId = usuario.vehiculoPrincipal?.id || "";
+
+  if (principalId !== vehiculoId) return;
+
+  const actualizacion = {
+    actualizadoEn: firestoreServerTimestamp()
+  };
+
+  if ("membresiaAplicada" in cambios) {
+    actualizacion["vehiculoPrincipal.membresiaAplicada"] =
+      cambios.membresiaAplicada;
+  }
+
+  if ("estadoMembresiaVehiculo" in cambios) {
+    actualizacion["vehiculoPrincipal.estadoMembresiaVehiculo"] =
+      cambios.estadoMembresiaVehiculo;
+  }
+
+  if ("requiereAutorizacion" in cambios) {
+    actualizacion["vehiculoPrincipal.requiereAutorizacion"] =
+      cambios.requiereAutorizacion;
+  }
+
+  await firestoreUpdateDoc(usuarioRef,actualizacion);
+}
+
+window.openVehicle = (uidCliente,vehiculoId) => {
+  const vehiculo = buscarVehiculo(uidCliente,vehiculoId);
+  if (!vehiculo) return;
+
+  const cliente = obtenerClienteVehiculo(vehiculo);
+  const estado = normalizarEstadoVehiculo(
+    vehiculo.estadoMembresiaVehiculo
+  );
+  const membresia = obtenerNumeroMembresiaVehiculo(
+    vehiculo,
+    cliente
+  );
+
+  openModal(
+    "Ficha del vehículo",
+    `
+      <p><b>Cliente:</b> ${escaparHtml(cliente?.name || "Cliente")}</p>
+      <p><b>Teléfono:</b> ${escaparHtml(cliente?.phone || "No registrado")}</p>
+      <p><b>Marca:</b> ${escaparHtml(vehiculo.marca || "No registrada")}</p>
+      <p><b>Submarca:</b> ${escaparHtml(vehiculo.subMarca || "No registrada")}</p>
+      <p><b>Modelo:</b> ${escaparHtml(vehiculo.raw?.modelo || vehiculo.raw?.anio || vehiculo.raw?.año || "No registrado")}</p>
+      <p><b>Color:</b> ${escaparHtml(vehiculo.color || "No registrado")}</p>
+      <p><b>Placas:</b> ${escaparHtml(vehiculo.placas || "Sin placas")}</p>
+      <p><b>VIN / Serie:</b> ${escaparHtml(vehiculo.serie || "Sin serie")}</p>
+      <p><b>Membresía:</b> ${escaparHtml(membresia)}</p>
+      <p><b>Estado:</b> ${escaparHtml(textoEstadoVehiculo(estado))}</p>
+      <div class="cardActions">
+        ${
+          estado === "pendiente_autorizacion"
+            ? `<button class="approve" onclick="closeModal();aprobarVehiculoDesdeLista('${escaparHtml(uidCliente)}','${escaparHtml(vehiculoId)}')">Aprobar membresía</button>`
+            : ""
+        }
+        ${
+          estado === "activo"
+            ? `<button class="reject" onclick="closeModal();quitarMembresiaVehiculo('${escaparHtml(uidCliente)}','${escaparHtml(vehiculoId)}')">Quitar membresía</button>`
+            : ""
+        }
+        ${
+          estado !== "activo" &&
+          estado !== "pendiente_autorizacion" &&
+          cliente?.hasMembership === true
+            ? `<button class="approve" onclick="closeModal();aplicarMembresiaVehiculo('${escaparHtml(uidCliente)}','${escaparHtml(vehiculoId)}')">Aplicar membresía</button>`
+            : ""
+        }
+      </div>
+    `
+  );
+};
+
+window.aprobarVehiculoDesdeLista = async (uidCliente,vehiculoId) => {
+  const vehiculo = buscarVehiculo(uidCliente,vehiculoId);
+  if (!vehiculo) return;
+
+  const confirmar = window.confirm(
+    `¿Aprobar la membresía para el vehículo ${vehiculo.placas || vehiculoId}?`
+  );
+
+  if (!confirmar) return;
+
+  const cambios = {
+    membresiaAplicada: true,
+    estadoMembresiaVehiculo: "activo",
+    requiereAutorizacion: false,
+    autorizacionEstado: "aprobada",
+    autorizacionAprobadaEn: firestoreServerTimestamp(),
+    actualizadoEn: firestoreServerTimestamp()
+  };
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(
+        db,
+        "usuarios",
+        uidCliente,
+        "vehiculos",
+        vehiculoId
+      ),
+      cambios
+    );
+
+    await sincronizarVehiculoPrincipal(
+      uidCliente,
+      vehiculoId,
+      cambios
+    );
+  } catch (error) {
+    console.error("Error aprobando vehículo:",error);
+
+    openModal(
+      "No fue posible aprobar",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.quitarMembresiaVehiculo = async (uidCliente,vehiculoId) => {
+  const vehiculo = buscarVehiculo(uidCliente,vehiculoId);
+  if (!vehiculo) return;
+
+  const confirmar = window.confirm(
+    `¿Quitar la membresía del vehículo ${vehiculo.placas || vehiculoId}?`
+  );
+
+  if (!confirmar) return;
+
+  const cambios = {
+    membresiaAplicada: false,
+    estadoMembresiaVehiculo: "sin_membresia",
+    requiereAutorizacion: false,
+    autorizacionEstado: "retirada_admin",
+    membresiaRetiradaEn: firestoreServerTimestamp(),
+    actualizadoEn: firestoreServerTimestamp()
+  };
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(
+        db,
+        "usuarios",
+        uidCliente,
+        "vehiculos",
+        vehiculoId
+      ),
+      cambios
+    );
+
+    await sincronizarVehiculoPrincipal(
+      uidCliente,
+      vehiculoId,
+      cambios
+    );
+  } catch (error) {
+    console.error("Error quitando membresía:",error);
+
+    openModal(
+      "No fue posible quitar la membresía",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.aplicarMembresiaVehiculo = async (uidCliente,vehiculoId) => {
+  const vehiculo = buscarVehiculo(uidCliente,vehiculoId);
+  const cliente = state.clients.find(c => c.id === uidCliente);
+
+  if (!vehiculo || !cliente?.hasMembership) {
+    window.alert("El cliente no tiene una membresía activa.");
+    return;
+  }
+
+  const confirmar = window.confirm(
+    `¿Aplicar la membresía de ${cliente.name} a este vehículo?`
+  );
+
+  if (!confirmar) return;
+
+  const cambios = {
+    membresiaAplicada: true,
+    estadoMembresiaVehiculo: "activo",
+    requiereAutorizacion: false,
+    numeroMembresiaSolicitada:
+      cliente.membership === "Membresía activa"
+        ? ""
+        : cliente.membership,
+    autorizacionEstado: "aplicada_admin",
+    autorizacionAprobadaEn: firestoreServerTimestamp(),
+    actualizadoEn: firestoreServerTimestamp()
+  };
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(
+        db,
+        "usuarios",
+        uidCliente,
+        "vehiculos",
+        vehiculoId
+      ),
+      cambios
+    );
+
+    await sincronizarVehiculoPrincipal(
+      uidCliente,
+      vehiculoId,
+      cambios
+    );
+  } catch (error) {
+    console.error("Error aplicando membresía:",error);
+
+    openModal(
+      "No fue posible aplicar la membresía",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
 function setToday(){
   const d = new Date();
   const etiqueta = document.getElementById("todayLabel");
@@ -1762,6 +2153,7 @@ document
     renderAuthorizations();
     renderProviders();
     renderClients();
+    renderVehicles();
     drawIncomeChart();
   });
 
@@ -1773,6 +2165,15 @@ document
   document
     .getElementById(id)
     ?.addEventListener("input",renderAllServices)
+);
+
+[
+  "vehicleSearch",
+  "vehicleStatusFilter"
+].forEach(id =>
+  document
+    .getElementById(id)
+    ?.addEventListener("input",renderVehicles)
 );
 
 document
@@ -1799,6 +2200,7 @@ function actualizarInterfazFirebase(){
   renderServices();
   renderProviders();
   renderClients();
+  renderVehicles();
   renderAuthorizations();
   drawIncomeChart();
 }
@@ -1949,6 +2351,7 @@ renderServices();
 renderAuthorizations();
 renderProviders();
 renderClients();
+renderVehicles();
 setToday();
 initMaps();
 drawIncomeChart();
