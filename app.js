@@ -2155,6 +2155,7 @@ document
     renderProviders();
     renderClients();
     renderVehicles();
+    renderMemberships();
     drawIncomeChart();
   });
 
@@ -2175,6 +2176,15 @@ document
   document
     .getElementById(id)
     ?.addEventListener("input",renderVehicles)
+);
+
+[
+  "membershipSearch",
+  "membershipStatusFilter"
+].forEach(id =>
+  document
+    .getElementById(id)
+    ?.addEventListener("input",renderMemberships)
 );
 
 document
@@ -2202,6 +2212,7 @@ function actualizarInterfazFirebase(){
   renderProviders();
   renderClients();
   renderVehicles();
+  renderMemberships();
   renderAuthorizations();
   drawIncomeChart();
 }
@@ -2256,6 +2267,11 @@ function escucharClientes(){
     snapshot => {
       state.clients = snapshot.docs.map(convertirCliente);
       escucharVehiculosPorUsuarios();
+
+      state.vehicles = combinarVehiculosRaizYSubcolecciones(
+        [...vehicleSnapshotsByUser.values()].flat()
+      );
+
       reconstruirAutorizaciones();
       actualizarInterfazFirebase();
     },
@@ -2283,12 +2299,232 @@ function escucharProveedores(){
 }
 
 
-function recombinarVehiculosDesdeUsuarios(){
-  state.vehicles = [...vehicleSnapshotsByUser.values()]
-    .flat()
+
+function usuarioTieneVehiculoRaiz(datos = {}){
+  return Boolean(
+    datos.vehiculoPrincipal?.id ||
+    datos.vehiculoPrincipal?.marca ||
+    datos.vehiculoPrincipal?.placas ||
+    datos.marca ||
+    datos.placas ||
+    datos.serie
+  );
+}
+
+function convertirVehiculoRaizDesdeUsuario(cliente){
+  const datos = cliente?.raw || {};
+  const principal = datos.vehiculoPrincipal || {};
+
+  return {
+    id: principal.id || `principal_${cliente.id}`,
+    uidCliente: cliente.id,
+    path: `usuarios/${cliente.id}`,
+    marca: principal.marca || datos.marca || "",
+    subMarca: principal.subMarca || datos.subMarca || "",
+    color: principal.color || datos.color || "",
+    placas: principal.placas || datos.placas || "",
+    serie: principal.serie || datos.serie || "",
+    membresiaAplicada:
+      principal.membresiaAplicada === true ||
+      datos.membresiaAplicada === true,
+    estadoMembresiaVehiculo:
+      principal.estadoMembresiaVehiculo ||
+      datos.estadoMembresiaVehiculo ||
+      (
+        principal.membresiaAplicada === true ||
+        datos.membresiaAplicada === true
+          ? "activo"
+          : "sin_membresia"
+      ),
+    requiereAutorizacion:
+      principal.requiereAutorizacion === true ||
+      datos.requiereAutorizacion === true,
+    numeroMembresiaSolicitada:
+      principal.numeroMembresiaSolicitada ||
+      datos.numeroMembresiaSolicitada ||
+      datos.numeroMiembro ||
+      datos.numeroMembresia ||
+      "",
+    solicitudMembresiaEn:
+      principal.solicitudMembresiaEn ||
+      datos.solicitudMembresiaEn ||
+      null,
+    creadoEn:
+      principal.creadoEn ||
+      datos.creadoEn ||
+      null,
+    raw: {
+      ...datos,
+      ...principal,
+      origenVehiculoAdmin: "usuario_raiz"
+    },
+    fromUserRoot: true
+  };
+}
+
+function combinarVehiculosRaizYSubcolecciones(vehiculosSubcoleccion){
+  const resultado = [...vehiculosSubcoleccion];
+
+  state.clients.forEach(cliente => {
+    if (!usuarioTieneVehiculoRaiz(cliente.raw)) return;
+
+    const raiz = convertirVehiculoRaizDesdeUsuario(cliente);
+
+    const yaExiste = resultado.some(v => {
+      if (v.uidCliente !== cliente.id) return false;
+
+      if (raiz.id && v.id === raiz.id) return true;
+
+      const placasA = String(v.placas || "").trim().toUpperCase();
+      const placasB = String(raiz.placas || "").trim().toUpperCase();
+      const serieA = String(v.serie || "").trim().toUpperCase();
+      const serieB = String(raiz.serie || "").trim().toUpperCase();
+
+      return (
+        (placasA && placasB && placasA === placasB) ||
+        (serieA && serieB && serieA === serieB)
+      );
+    });
+
+    if (!yaExiste) {
+      resultado.push(raiz);
+    }
+  });
+
+  return resultado;
+}
+
+function normalizarEstadoMembresiaCliente(cliente){
+  const datos = cliente?.raw || {};
+  const estado = String(
+    datos.estadoMembresia ||
+    datos.membresia?.estado ||
+    (cliente?.hasMembership ? "activa" : "sin_membresia")
+  )
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/\s+/g,"_");
+
+  if (["activa","activo"].includes(estado)) return "activa";
+  if (["pendiente","pendiente_autorizacion"].includes(estado)) return "pendiente";
+  if (["vencida","vencido"].includes(estado)) return "vencida";
+  if (["suspendida","suspendido","cancelada","cancelado"].includes(estado)) return "suspendida";
+
+  return cliente?.hasMembership ? "activa" : "sin_membresia";
+}
+
+function textoEstadoMembresiaCliente(estado){
+  const mapa = {
+    activa: "Activa",
+    pendiente: "Pendiente",
+    vencida: "Vencida",
+    suspendida: "Suspendida",
+    sin_membresia: "Sin membresía"
+  };
+
+  return mapa[estado] || "Sin membresía";
+}
+
+function claseEstadoMembresiaCliente(estado){
+  if (estado === "activa") return "status-disponible";
+  if (estado === "pendiente") return "status-pendiente";
+  if (estado === "vencida" || estado === "suspendida") return "status-cancelado";
+  return "status-finalizado";
+}
+
+function renderMemberships(){
+  const cuerpo = document.getElementById("membershipsBody");
+  if (!cuerpo) return;
+
+  const q = String(
+    document.getElementById("membershipSearch")?.value || ""
+  ).trim().toLowerCase();
+
+  const filtro =
+    document.getElementById("membershipStatusFilter")?.value || "";
+
+  const filas = state.clients
+    .map(cliente => {
+      const datos = cliente.raw || {};
+      const estado = normalizarEstadoMembresiaCliente(cliente);
+
+      const numero =
+        datos.numeroMiembro ||
+        datos.numeroMembresia ||
+        datos.numeroSocio ||
+        (cliente.hasMembership ? cliente.membership : "Sin membresía");
+
+      const tipo =
+        datos.tipoMembresia ||
+        datos.membresia?.tipo ||
+        datos.tipoCliente ||
+        "AS CLICK";
+
+      const vehiculos = state.vehicles.filter(
+        v => v.uidCliente === cliente.id
+      ).length;
+
+      return {
+        cliente,
+        estado,
+        numero,
+        tipo,
+        vehiculos
+      };
+    })
+    .filter(item => {
+      const textoBusqueda = [
+        item.cliente.name,
+        item.cliente.phone,
+        item.numero,
+        item.tipo
+      ].join(" ").toLowerCase();
+
+      return (
+        (!q || textoBusqueda.includes(q)) &&
+        (!filtro || item.estado === filtro)
+      );
+    })
     .sort((a,b) =>
-      obtenerMilisegundos(b.creadoEn) - obtenerMilisegundos(a.creadoEn)
+      a.cliente.name.localeCompare(b.cliente.name,"es")
     );
+
+  if (!filas.length) {
+    cuerpo.innerHTML = `
+      <tr>
+        <td colspan="6">No hay membresías que coincidan con los filtros.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  cuerpo.innerHTML = filas.map(item => `
+    <tr>
+      <td><b>${escaparHtml(item.cliente.name)}</b></td>
+      <td>${escaparHtml(item.cliente.phone)}</td>
+      <td>${escaparHtml(item.numero)}</td>
+      <td>${escaparHtml(item.tipo)}</td>
+      <td>
+        <span class="statusBadge ${claseEstadoMembresiaCliente(item.estado)}">
+          ${escaparHtml(textoEstadoMembresiaCliente(item.estado))}
+        </span>
+      </td>
+      <td>${escaparHtml(item.vehiculos)}</td>
+    </tr>
+  `).join("");
+}
+
+function recombinarVehiculosDesdeUsuarios(){
+  const vehiculosSubcoleccion = [...vehicleSnapshotsByUser.values()]
+    .flat();
+
+  state.vehicles = combinarVehiculosRaizYSubcolecciones(
+    vehiculosSubcoleccion
+  ).sort((a,b) =>
+    obtenerMilisegundos(b.creadoEn) - obtenerMilisegundos(a.creadoEn)
+  );
 
   reconstruirAutorizaciones();
   actualizarInterfazFirebase();
@@ -2309,8 +2545,9 @@ function detenerListenersVehiculos(){
 
 function escucharVehiculosPorUsuarios(){
   if (!firebaseReady || !state.clients.length) {
-    state.vehicles = [];
+    state.vehicles = combinarVehiculosRaizYSubcolecciones([]);
     renderVehicles();
+    renderMemberships();
     return;
   }
 
@@ -2400,6 +2637,7 @@ renderAuthorizations();
 renderProviders();
 renderClients();
 renderVehicles();
+renderMemberships();
 setToday();
 initMaps();
 drawIncomeChart();
