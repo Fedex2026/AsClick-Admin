@@ -669,18 +669,30 @@ function recalcularKpis(){
   kpiBottomData[1][1] = String(ocupados);
   kpiBottomData[2][1] = state.clients.length.toLocaleString("es-MX");
   kpiBottomData[3][1] = membresias.toLocaleString("es-MX");
-  kpiBottomData[4][1] = String(state.authorizations.length);
+  const proveedoresPendientesAutorizacion =
+    obtenerProveedoresPendientesAutorizacion().length;
+
+  const totalAutorizacionesPendientes =
+    state.authorizations.length +
+    proveedoresPendientesAutorizacion;
+
+  kpiBottomData[4][1] = String(totalAutorizacionesPendientes);
   kpiBottomData[5][1] = formatearDinero(ingresosHoy);
 
   kpiBottomData[0].sub = `de ${conectados} conectados`;
   kpiBottomData[1].sub = `de ${conectados} conectados`;
   kpiBottomData[2].sub = "en total";
   kpiBottomData[3].sub = "membresías detectadas";
-  kpiBottomData[4].sub = "se conectará después";
+  kpiBottomData[4].sub =
+    totalAutorizacionesPendientes > 0
+      ? "pendientes de revisión"
+      : "sin pendientes";
   kpiBottomData[5].sub = ingresosHoy > 0 ? "servicios finalizados hoy" : "sin importes registrados";
 
   const badge = document.getElementById("authBadge");
-  if (badge) badge.textContent = String(state.authorizations.length);
+  if (badge) {
+    badge.textContent = String(totalAutorizacionesPendientes);
+  }
 
   renderKpis();
 }
@@ -792,55 +804,222 @@ function renderAllServices(){
   `).join("");
 }
 
+
+function proveedorPendienteAutorizacion(proveedor){
+  const datos = proveedor?.raw || {};
+
+  const estado = String(
+    datos.estado || ""
+  ).trim().toLowerCase();
+
+  const estadoSolicitud = String(
+    datos.estadoSolicitud || ""
+  ).trim().toLowerCase();
+
+  return (
+    estado === "pendiente" ||
+    estadoSolicitud === "pendiente"
+  );
+}
+
+function obtenerProveedoresPendientesAutorizacion(){
+  return state.providers.filter(
+    proveedor => proveedorPendienteAutorizacion(proveedor)
+  );
+}
+
+function fechaSolicitudProveedor(proveedor){
+  const datos = proveedor?.raw || {};
+
+  return formatearFecha(
+    datos.fechaSolicitud ||
+    datos.fechaRegistro ||
+    datos.creadoEn ||
+    datos.createdAt ||
+    datos.altaEn ||
+    null
+  );
+}
+
+function detalleProveedorPendiente(proveedor){
+  const datos = proveedor?.raw || {};
+
+  return {
+    id: proveedor.id,
+    name: proveedor.name || "Proveedor",
+    type: normalizarTipoServicio(
+      datos.tipoProveedor ||
+      datos.tipo ||
+      datos.tipoServicio ||
+      proveedor?.type ||
+      "Proveedor"
+    ),
+    telefono:
+      proveedor.telefono ||
+      datos.telefono ||
+      datos.celular ||
+      "No registrado",
+    correo:
+      datos.correo ||
+      datos.email ||
+      "No registrado",
+    unidad:
+      datos.unidad?.tipoUnidad ||
+      datos.unidad?.tipo ||
+      datos.tipoUnidad ||
+      datos.vehiculo?.tipo ||
+      "No registrada",
+    time:
+      fechaSolicitudProveedor(proveedor)
+  };
+}
+
 function renderAuthorizations(){
   const resumen = document.getElementById("pendingAuthorizations");
   const tarjetas = document.getElementById("authorizationCards");
 
+  const vehiculosPendientes = state.authorizations || [];
+  const proveedoresPendientes =
+    obtenerProveedoresPendientesAutorizacion();
+
+  const totalPendientes =
+    vehiculosPendientes.length +
+    proveedoresPendientes.length;
+
   if (resumen) {
-    resumen.innerHTML = state.authorizations.length
-      ? state.authorizations.map(a => `
-          <div class="authRow">
-            <div class="miniAvatar">${escaparHtml(a.initials)}</div>
-            <div class="rowMain"><b>${escaparHtml(a.name)}</b><span>${escaparHtml(a.detail)}</span></div>
-            <div class="rowMain"><b>${escaparHtml(a.type)}</b><span>${escaparHtml(a.time)}</span></div>
-            <span class="pill">Pendiente</span>
+    const filas = [];
+
+    proveedoresPendientes.forEach(proveedor => {
+      const p = detalleProveedorPendiente(proveedor);
+
+      filas.push(`
+        <div class="authRow">
+          <div class="miniAvatar">P</div>
+          <div class="rowMain">
+            <b>${escaparHtml(p.name)}</b>
+            <span>Proveedor nuevo · ${escaparHtml(p.telefono)}</span>
           </div>
-        `).join("")
+          <div class="rowMain">
+            <b>${escaparHtml(p.type)}</b>
+            <span>${escaparHtml(p.time)}</span>
+          </div>
+          <span class="pill">Pendiente</span>
+        </div>
+      `);
+    });
+
+    vehiculosPendientes.forEach(a => {
+      filas.push(`
+        <div class="authRow">
+          <div class="miniAvatar">${escaparHtml(a.initials)}</div>
+          <div class="rowMain">
+            <b>${escaparHtml(a.name)}</b>
+            <span>${escaparHtml(a.detail)}</span>
+          </div>
+          <div class="rowMain">
+            <b>${escaparHtml(a.type)}</b>
+            <span>${escaparHtml(a.time)}</span>
+          </div>
+          <span class="pill">Pendiente</span>
+        </div>
+      `);
+    });
+
+    resumen.innerHTML = totalPendientes
+      ? filas.join("")
       : `
-          <div class="authRow">
-            <div class="miniAvatar">✓</div>
-            <div class="rowMain">
-              <b>Sin autorizaciones pendientes</b>
-              <span>No hay vehículos esperando revisión.</span>
-            </div>
-            <div></div>
-            <span class="statusBadge status-finalizado">0</span>
+        <div class="authRow">
+          <div class="miniAvatar">✓</div>
+          <div class="rowMain">
+            <b>Sin autorizaciones pendientes</b>
+            <span>No hay proveedores ni vehículos esperando revisión.</span>
           </div>
-        `;
+          <div></div>
+          <span class="statusBadge status-finalizado">0</span>
+        </div>
+      `;
   }
 
   if (tarjetas) {
-    tarjetas.innerHTML = state.authorizations.length
-      ? state.authorizations.map((a,i) => `
-          <article class="authCard" data-auth="${i}">
-            <div class="miniAvatar">${escaparHtml(a.initials)}</div>
-            <h3>${escaparHtml(a.name)}</h3>
-            <p>${escaparHtml(a.detail)}</p>
-            <p><b>Membresía:</b> ${escaparHtml(a.membership || "Sin número")}<br><b>Tipo:</b> ${escaparHtml(a.type)}<br><b>Solicitud:</b> ${escaparHtml(a.time)}</p>
-            <div class="cardActions">
-              <button class="approve" onclick="approveAuth(${i})">Aprobar</button>
-              <button class="reject" onclick="rejectAuth(${i})">Rechazar</button>
-              <button onclick="openAuth(${i})">Ver expediente</button>
-            </div>
-          </article>
-        `).join("")
+    const cards = [];
+
+    proveedoresPendientes.forEach(proveedor => {
+      const p = detalleProveedorPendiente(proveedor);
+
+      cards.push(`
+        <article class="authCard">
+          <div class="miniAvatar">P</div>
+          <h3>${escaparHtml(p.name)}</h3>
+          <p><b>Proveedor pendiente de autorización</b></p>
+          <p>
+            <b>Servicio:</b> ${escaparHtml(p.type)}<br>
+            <b>Teléfono:</b> ${escaparHtml(p.telefono)}<br>
+            <b>Correo:</b> ${escaparHtml(p.correo)}<br>
+            <b>Unidad:</b> ${escaparHtml(p.unidad)}<br>
+            <b>Solicitud:</b> ${escaparHtml(p.time)}
+          </p>
+
+          <div class="cardActions">
+            <button
+              class="approve"
+              onclick="aprobarProveedorPendiente('${escaparHtml(p.id)}')"
+            >
+              Autorizar proveedor
+            </button>
+
+            <button
+              class="reject"
+              onclick="rechazarProveedorPendiente('${escaparHtml(p.id)}')"
+            >
+              Rechazar
+            </button>
+
+            <button
+              onclick="verProveedorPendiente('${escaparHtml(p.id)}')"
+            >
+              Ver expediente
+            </button>
+          </div>
+        </article>
+      `);
+    });
+
+    vehiculosPendientes.forEach((a,i) => {
+      cards.push(`
+        <article class="authCard" data-auth="${i}">
+          <div class="miniAvatar">${escaparHtml(a.initials)}</div>
+          <h3>${escaparHtml(a.name)}</h3>
+          <p>${escaparHtml(a.detail)}</p>
+          <p>
+            <b>Membresía:</b> ${escaparHtml(a.membership || "Sin número")}<br>
+            <b>Tipo:</b> ${escaparHtml(a.type)}<br>
+            <b>Solicitud:</b> ${escaparHtml(a.time)}
+          </p>
+
+          <div class="cardActions">
+            <button class="approve" onclick="approveAuth(${i})">
+              Aprobar
+            </button>
+            <button class="reject" onclick="rejectAuth(${i})">
+              Rechazar
+            </button>
+            <button onclick="openAuth(${i})">
+              Ver expediente
+            </button>
+          </div>
+        </article>
+      `);
+    });
+
+    tarjetas.innerHTML = totalPendientes
+      ? cards.join("")
       : `
-          <article class="authCard">
-            <div class="miniAvatar">✓</div>
-            <h3>Sin autorizaciones pendientes</h3>
-            <p>No hay vehículos esperando revisión.</p>
-          </article>
-        `;
+        <article class="authCard">
+          <div class="miniAvatar">✓</div>
+          <h3>Sin autorizaciones pendientes</h3>
+          <p>No hay proveedores ni vehículos esperando revisión.</p>
+        </article>
+      `;
   }
 }
 
@@ -2066,6 +2245,168 @@ async function actualizarVehiculoPrincipalSiCoincide(a,cambios){
     actualizadoEn: firestoreServerTimestamp()
   });
 }
+
+
+window.verProveedorPendiente = id => {
+  const proveedor = state.providers.find(
+    p => p.id === id
+  );
+
+  if (!proveedor) return;
+
+  const p = detalleProveedorPendiente(proveedor);
+  const datos = proveedor.raw || {};
+
+  openModal(
+    "Expediente de proveedor",
+    `
+      <p><b>Nombre:</b> ${escaparHtml(p.name)}</p>
+      <p><b>Tipo de proveedor:</b> ${escaparHtml(p.type)}</p>
+      <p><b>Teléfono:</b> ${escaparHtml(p.telefono)}</p>
+      <p><b>Correo:</b> ${escaparHtml(p.correo)}</p>
+      <p><b>Unidad:</b> ${escaparHtml(p.unidad)}</p>
+      <p><b>Estado:</b> Pendiente de autorización</p>
+      <p><b>Solicitud:</b> ${escaparHtml(p.time)}</p>
+
+      ${
+        datos.placas
+          ? `<p><b>Placas:</b> ${escaparHtml(datos.placas)}</p>`
+          : ""
+      }
+
+      ${
+        datos.marcaUnidad || datos.marca
+          ? `<p><b>Marca:</b> ${escaparHtml(datos.marcaUnidad || datos.marca)}</p>`
+          : ""
+      }
+
+      <div class="cardActions">
+        <button
+          class="approve"
+          onclick="closeModal();aprobarProveedorPendiente('${escaparHtml(id)}')"
+        >
+          Autorizar proveedor
+        </button>
+
+        <button
+          class="reject"
+          onclick="closeModal();rechazarProveedorPendiente('${escaparHtml(id)}')"
+        >
+          Rechazar
+        </button>
+      </div>
+    `
+  );
+};
+
+window.aprobarProveedorPendiente = async id => {
+  const proveedor = state.providers.find(
+    p => p.id === id
+  );
+
+  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) {
+    return;
+  }
+
+  if (
+    !window.confirm(
+      `¿Autorizar a ${proveedor.name} como ${proveedor.type}?`
+    )
+  ) {
+    return;
+  }
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(
+        db,
+        "proveedores",
+        proveedor.id
+      ),
+      {
+        activo: true,
+        autorizado: true,
+        estado: "autorizado",
+        estadoSolicitud: "autorizado",
+        bajaAdmin: false,
+        suspendido: false,
+        fechaAutorizacion:
+          firestoreServerTimestamp(),
+        ultimaActualizacion:
+          firestoreServerTimestamp()
+      }
+    );
+
+    closeModal();
+  } catch (error) {
+    console.error(
+      "Error autorizando proveedor:",
+      error
+    );
+
+    openModal(
+      "No fue posible autorizar",
+      `
+        <p>Firebase rechazó la autorización del proveedor.</p>
+        <p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>
+      `
+    );
+  }
+};
+
+window.rechazarProveedorPendiente = async id => {
+  const proveedor = state.providers.find(
+    p => p.id === id
+  );
+
+  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) {
+    return;
+  }
+
+  const motivo = window.prompt(
+    `Motivo para rechazar a ${proveedor.name}:`,
+    ""
+  );
+
+  if (motivo === null) return;
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(
+        db,
+        "proveedores",
+        proveedor.id
+      ),
+      {
+        activo: false,
+        autorizado: false,
+        estado: "rechazado",
+        estadoSolicitud: "rechazado",
+        motivoRechazo:
+          String(motivo || "No especificado").trim(),
+        fechaRechazo:
+          firestoreServerTimestamp(),
+        ultimaActualizacion:
+          firestoreServerTimestamp()
+      }
+    );
+
+    closeModal();
+  } catch (error) {
+    console.error(
+      "Error rechazando proveedor:",
+      error
+    );
+
+    openModal(
+      "No fue posible rechazar",
+      `
+        <p>Firebase rechazó la actualización.</p>
+        <p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>
+      `
+    );
+  }
+};
 
 window.approveAuth = async i => {
   const a = state.authorizations[i];
