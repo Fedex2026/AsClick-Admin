@@ -328,6 +328,16 @@ function obtenerEstadoProveedor(datos = {}){
   ).trim().toLowerCase();
 
   if (
+    datos.bajaAdmin === true ||
+    datos.suspendido === true ||
+    datos.activo === false ||
+    estadoConexion === "suspendido" ||
+    estadoConexion === "baja"
+  ) {
+    return "Baja";
+  }
+
+  if (
     datos.ocupado === true ||
     estadoConexion === "ocupado" ||
     Boolean(datos.servicioActualId)
@@ -345,15 +355,13 @@ function obtenerEstadoProveedor(datos = {}){
   }
 
   if (
-    datos.activo === false ||
-    datos.suspendido === true ||
-    estadoConexion === "suspendido" ||
-    estadoConexion === "desconectado"
+    estadoConexion === "desconectado" ||
+    datos.disponible === false
   ) {
     return "Desconectado";
   }
 
-  return datos.disponible === false ? "Desconectado" : "Disponible";
+  return "Disponible";
 }
 
 function convertirProveedor(doc){
@@ -550,7 +558,19 @@ function proveedorCoincideConUid(proveedor, uid){
   return candidatos.includes(objetivo);
 }
 
+function proveedorEstaDeBaja(proveedor){
+  return (
+    proveedor?.status === "Baja" ||
+    proveedor?.raw?.bajaAdmin === true ||
+    proveedor?.raw?.suspendido === true ||
+    proveedor?.raw?.activo === false ||
+    String(proveedor?.raw?.estadoConexion || "").toLowerCase() === "suspendido"
+  );
+}
+
 function proveedorTieneServicioActivo(proveedor){
+  if (proveedorEstaDeBaja(proveedor)) return false;
+
   const uidsOcupados = obtenerUidsProveedoresOcupados();
 
   if (
@@ -567,6 +587,10 @@ function proveedorTieneServicioActivo(proveedor){
 }
 
 function estadoProveedorEnTiempoReal(proveedor){
+  if (proveedorEstaDeBaja(proveedor)) {
+    return "Baja";
+  }
+
   if (proveedorTieneServicioActivo(proveedor)) {
     return "Ocupado";
   }
@@ -860,7 +884,14 @@ function renderProviders(){
               ${escaparHtml(p.telefono)}
             </p>
             <span class="statusBadge ${statusClass(p.status)}">${escaparHtml(p.status)}</span>
-            <div class="cardActions"><button onclick="openProvider('${escaparHtml(p.id)}')">Ver ficha</button></div>
+            <div class="cardActions">
+              <button onclick="openProvider('${escaparHtml(p.id)}')">Ver ficha</button>
+              ${
+                p.status === "Baja"
+                  ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
+                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
+              }
+            </div>
           </article>
         `).join("")
       : `
@@ -1204,6 +1235,8 @@ function closeModal(){
   document.getElementById("modalOverlay").hidden = true;
 }
 
+window.closeModal = closeModal;
+
 document
   .getElementById("modalClose")
   .addEventListener("click",closeModal);
@@ -1252,16 +1285,101 @@ window.openProvider = id => {
   const p = state.providers.find(item => item.id === id);
   if (!p) return;
 
+  const estadoActual = estadoProveedorEnTiempoReal(p);
+
   openModal(
     p.name,
     `
       <p><b>Tipo:</b> ${escaparHtml(p.type)}</p>
       <p><b>Calificación:</b> ★ ${escaparHtml(p.rating)}</p>
       <p><b>Servicios:</b> ${escaparHtml(p.services)}</p>
-      <p><b>Estado:</b> ${escaparHtml(p.status)}</p>
+      <p><b>Estado:</b> ${escaparHtml(estadoActual)}</p>
       <p><b>Teléfono:</b> ${escaparHtml(p.telefono)}</p>
+      <div class="cardActions">
+        ${
+          estadoActual === "Baja"
+            ? `<button class="approve" onclick="closeModal();darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
+            : `<button class="reject" onclick="closeModal();darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
+        }
+      </div>
     `
   );
+};
+
+
+window.darBajaProveedor = async id => {
+  const proveedor = state.providers.find(p => p.id === id);
+  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  if (proveedorTieneServicioActivo(proveedor)) {
+    openModal(
+      "Proveedor ocupado",
+      "<p>No se puede dar de baja a este proveedor mientras tenga un servicio activo. Finaliza o reasigna primero el servicio.</p>"
+    );
+    return;
+  }
+
+  const confirmar = window.confirm(
+    `¿Dar de baja a ${proveedor.name}? Dejará de aparecer como disponible.`
+  );
+
+  if (!confirmar) return;
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"proveedores",id),
+      {
+        bajaAdmin: true,
+        suspendido: true,
+        activo: false,
+        disponible: false,
+        estadoConexion: "suspendido",
+        servicioActualId: null,
+        bajaAdminEn: firestoreServerTimestamp(),
+        ultimaActualizacion: firestoreServerTimestamp()
+      }
+    );
+  } catch (error) {
+    console.error("Error dando de baja proveedor:",error);
+
+    openModal(
+      "No fue posible dar de baja",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+window.darAltaProveedor = async id => {
+  const proveedor = state.providers.find(p => p.id === id);
+  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  const confirmar = window.confirm(
+    `¿Dar de alta nuevamente a ${proveedor.name}?`
+  );
+
+  if (!confirmar) return;
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"proveedores",id),
+      {
+        bajaAdmin: false,
+        suspendido: false,
+        activo: true,
+        disponible: true,
+        estadoConexion: "disponible",
+        altaAdminEn: firestoreServerTimestamp(),
+        ultimaActualizacion: firestoreServerTimestamp()
+      }
+    );
+  } catch (error) {
+    console.error("Error dando de alta proveedor:",error);
+
+    openModal(
+      "No fue posible dar de alta",
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
 };
 
 window.openAuth = i => {
