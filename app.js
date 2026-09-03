@@ -24,6 +24,7 @@ let unsubscribeServices = null;
 let unsubscribeProviders = null;
 let unsubscribeClients = null;
 let unsubscribeVehicles = [];
+let unsubscribeMemberships = null;
 const vehicleSnapshotsByUser = new Map();
 
 const kpiTopData = [
@@ -2203,7 +2204,9 @@ document
 
 document
   .getElementById("generateMembershipBtn")
-  ?.addEventListener("click",abrirGeneradorMembresias);
+  ?.addEventListener("click",() => {
+    window.abrirGeneradorMembresias();
+  });
 
 document
   .getElementById("newServiceBtn")
@@ -2470,6 +2473,9 @@ function normalizarEstadoMembresiaAdmin(membresia = {}){
   const fin =
     membresia.fechaFin ||
     membresia.finVigencia ||
+    membresia.fin ||
+    membresia.fechaVencimiento ||
+    membresia.vencimiento ||
     membresia.vigencia ||
     null;
 
@@ -2587,12 +2593,17 @@ function renderMemberships(){
       const inicio =
         m.fechaInicio ||
         m.inicioVigencia ||
+        m.inicio ||
+        m.fechaActivacion ||
         m.fechaVinculacion ||
         null;
 
       const fin =
         m.fechaFin ||
         m.finVigencia ||
+        m.fin ||
+        m.fechaVencimiento ||
+        m.vencimiento ||
         m.vigencia ||
         null;
 
@@ -2775,7 +2786,13 @@ window.abrirGeneradorMembresias = () => {
 };
 
 window.generarMembresiasAdmin = async () => {
-  if (!firebaseReady || !firestoreWriteBatch || !firestoreSetDoc) return;
+  if (!firebaseReady || !firestoreWriteBatch || !firestoreDoc) {
+    openModal(
+      "Firebase no está listo",
+      "<p>No se pudo iniciar el generador de membresías. Actualiza la página e inténtalo de nuevo.</p>"
+    );
+    return;
+  }
 
   const cantidad = Math.min(
     100,
@@ -2818,6 +2835,8 @@ window.generarMembresiasAdmin = async () => {
           tipoCliente: "",
           fechaInicio: null,
           fechaFin: null,
+          inicioVigencia: null,
+          finVigencia: null,
           creadoEn: firestoreServerTimestamp(),
           creadoPorAdmin: true
         },
@@ -2859,6 +2878,9 @@ function fechaFinRenovada(membresia){
   const finActual = fechaDesdeFirestore(
     membresia.fechaFin ||
     membresia.finVigencia ||
+    membresia.fin ||
+    membresia.fechaVencimiento ||
+    membresia.vencimiento ||
     membresia.vigencia
   );
 
@@ -3083,7 +3105,9 @@ function escucharVehiculosPorUsuarios(){
 function escucharMembresias(){
   if (!firebaseReady) return;
 
-  unsubscribeMemberships?.();
+  if (typeof unsubscribeMemberships === "function") {
+    unsubscribeMemberships();
+  }
 
   unsubscribeMemberships = firestoreOnSnapshot(
     firestoreCollection(db,"membresias"),
@@ -3093,10 +3117,21 @@ function escucharMembresias(){
         ...documento.data()
       }));
 
-      actualizarInterfazFirebase();
+      console.log(
+        "Membresías cargadas desde Firebase:",
+        state.memberships.length
+      );
+
+      renderMemberships();
+      renderMembershipKpis();
     },
     error => {
       console.error("Error leyendo membresías:",error);
+
+      openModal(
+        "Error leyendo membresías",
+        `<p>Firebase no permitió leer la colección membresias.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+      );
     }
   );
 }
