@@ -219,18 +219,22 @@
             <h2>Membresías</h2>
             <p>Altas, renovaciones, vigencias, suspensiones y cancelaciones.</p>
           </div>
+          <button class="primaryButton" id="generateMembershipBtn">+ Generar membresías</button>
         </div>
+
+        <div class="kpiGrid" id="membershipKpis"></div>
 
         <div class="panel">
           <div class="filters">
-            <input id="membershipSearch" type="search" placeholder="Buscar cliente, teléfono o membresía">
+            <input id="membershipSearch" type="search" placeholder="Buscar número, cliente, teléfono o correo">
             <select id="membershipStatusFilter">
               <option value="">Todos los estados</option>
-              <option value="activa">Activa</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="vencida">Vencida</option>
-              <option value="suspendida">Suspendida</option>
-              <option value="sin_membresia">Sin membresía</option>
+              <option value="pendiente_activacion">Disponibles</option>
+              <option value="activa">Activas</option>
+              <option value="vence_pronto">Vencen pronto</option>
+              <option value="vencida">Vencidas</option>
+              <option value="suspendida">Suspendidas</option>
+              <option value="cancelada">Canceladas</option>
             </select>
           </div>
 
@@ -238,12 +242,16 @@
             <table>
               <thead>
                 <tr>
+                  <th>Número</th>
                   <th>Cliente</th>
                   <th>Teléfono</th>
-                  <th>Número de membresía</th>
+                  <th>Plan</th>
                   <th>Tipo</th>
                   <th>Estado</th>
-                  <th>Vehículos</th>
+                  <th>Inicio</th>
+                  <th>Vence</th>
+                  <th>Días</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody id="membershipsBody"></tbody>
