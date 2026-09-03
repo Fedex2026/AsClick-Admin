@@ -213,7 +213,44 @@
           </div>
         </div>
       </section>
-      <section class="pageSection placeholder" id="section-membresias"><h2>Membresías</h2><p>Altas, renovaciones, vigencias, suspensiones y cancelaciones.</p></section>
+      <section class="pageSection" id="section-membresias">
+        <div class="contentHeader">
+          <div>
+            <h2>Membresías</h2>
+            <p>Altas, renovaciones, vigencias, suspensiones y cancelaciones.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="filters">
+            <input id="membershipSearch" type="search" placeholder="Buscar cliente, teléfono o membresía">
+            <select id="membershipStatusFilter">
+              <option value="">Todos los estados</option>
+              <option value="activa">Activa</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="vencida">Vencida</option>
+              <option value="suspendida">Suspendida</option>
+              <option value="sin_membresia">Sin membresía</option>
+            </select>
+          </div>
+
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Número de membresía</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                  <th>Vehículos</th>
+                </tr>
+              </thead>
+              <tbody id="membershipsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
       <section class="pageSection placeholder" id="section-gremios"><h2>MONTEC / ACME</h2><p>Validación de afiliaciones y números de estampa.</p></section>
       <section class="pageSection placeholder" id="section-pagos"><h2>Pagos</h2><p>Ingresos, costos de proveedor, comisión y utilidad.</p></section>
       <section class="pageSection placeholder" id="section-incidencias"><h2>Incidencias</h2><p>Quejas, problemas operativos, evidencias y resolución.</p></section>
