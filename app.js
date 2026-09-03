@@ -4,7 +4,8 @@ const state = {
   providers: [],
   clients: [],
   vehicles: [],
-  memberships: []
+  memberships: [],
+  towQuotes: new Map()
 };
 
 let firebaseReady = false;
@@ -27,6 +28,7 @@ let unsubscribeProviders = null;
 let unsubscribeClients = null;
 let unsubscribeVehicles = [];
 let unsubscribeMemberships = null;
+let towQuoteUnsubscribers = new Map();
 const vehicleSnapshotsByUser = new Map();
 
 const kpiTopData = [
@@ -79,6 +81,8 @@ function normalizarEstadoServicio(valor){
 
   const equivalencias = {
     pendiente_cabina: "Pendiente",
+    pendiente_cotizacion: "Pendiente cotización",
+    esperando_autorizacion_cliente: "Esperando autorización cliente",
     solicitado: "Pendiente",
     pendiente: "Pendiente",
     buscando_proveedor: "Pendiente",
@@ -1846,6 +1850,7 @@ window.openService = folio => {
       <p><b>Proveedor:</b> ${escaparHtml(s.proveedor)}</p>
       <p><b>Estado:</b> ${escaparHtml(s.estado)}</p>
       <p><b>Hora:</b> ${escaparHtml(s.hora)}</p>
+      ${datos.grua ? `<p><b>Categoría grúa:</b> ${escaparHtml(datos.grua.categoria || "-")}</p><p><b>Condición:</b> ${escaparHtml(datos.grua.condicion || "-")}</p><p><b>Carga:</b> ${datos.grua.esVehiculoCarga ? escaparHtml(`${datos.grua.estadoCarga || ""} ${datos.grua.tipoCarga || ""} ${datos.grua.pesoCargaAproximado || ""}`.trim()) : "No"}</p>` : ""}
       ${
         ubicacion
           ? `<p><b>Ubicación:</b> ${escaparHtml(String(ubicacion))}</p>`
@@ -2569,6 +2574,7 @@ function actualizarInterfazFirebase(){
   renderMemberships();
   renderMembershipKpis();
   renderAuthorizations();
+  renderTowQuotes();
   drawIncomeChart();
 }
 
@@ -3575,6 +3581,7 @@ function escucharServicios(){
     firestoreCollection(db,"solicitudes"),
     snapshot => {
       state.services = snapshot.docs.map(convertirSolicitud);
+      sincronizarListenersCotizacionesGrua();
       actualizarInterfazFirebase();
     },
     error => {
@@ -3583,10 +3590,50 @@ function escucharServicios(){
   );
 }
 
+
+function obtenerSolicitudesGruaCotizacion(){
+  return state.services.filter(s => s.servicio === "Grúa" && ["pendiente_cotizacion","esperando_autorizacion_cliente","asignado"].includes(String(s.estadoRaw || "")) && (s.raw?.grua || s.raw?.cotizacionAutorizada));
+}
+
+function sincronizarListenersCotizacionesGrua(){
+  if (!firebaseReady || !firestoreOnSnapshot || !firestoreCollection) return;
+  const ids = new Set(obtenerSolicitudesGruaCotizacion().map(s => s.id));
+  for (const [id, unsub] of towQuoteUnsubscribers.entries()) {
+    if (!ids.has(id)) { unsub?.(); towQuoteUnsubscribers.delete(id); state.towQuotes.delete(id); }
+  }
+  ids.forEach(id => {
+    if (towQuoteUnsubscribers.has(id)) return;
+    const unsub = firestoreOnSnapshot(firestoreCollection(db,"solicitudes",id,"cotizaciones"), snapshot => {
+      state.towQuotes.set(id, snapshot.docs.map(d => ({id:d.id,...d.data()})));
+      renderTowQuotes();
+    }, error => console.error("Error leyendo cotizaciones",id,error));
+    towQuoteUnsubscribers.set(id,unsub);
+  });
+}
+
+function renderTowQuotes(){
+  const body=document.getElementById("towQuotesBody"); if(!body) return;
+  const list=obtenerSolicitudesGruaCotizacion().sort((a,b)=>obtenerMilisegundos(b.fecha)-obtenerMilisegundos(a.fecha));
+  if(!list.length){body.innerHTML='<tr><td colspan="8">No hay solicitudes de grúa en cotización.</td></tr>';return;}
+  body.innerHTML=list.map(s=>{
+    const g=s.raw?.grua||{}; const quotes=state.towQuotes.get(s.id)||[];
+    const carga=g.esVehiculoCarga ? (g.estadoCarga==="con_carga" ? `Con carga · ${g.tipoCarga||""} ${g.pesoCargaAproximado||""}`.trim() : "Vacío") : "No es carga";
+    return `<tr><td><b>${escaparHtml(s.folio)}</b></td><td>${escaparHtml(s.cliente)}</td><td>${escaparHtml(g.categoria||"-")}</td><td>${escaparHtml(g.condicion||"-")}</td><td>${escaparHtml(carga)}</td><td><span class="quoteCount">${quotes.length}</span></td><td><span class="statusBadge ${statusClass(s.estado)}">${escaparHtml(s.estado)}</span></td><td><button class="tableAction" onclick="verCotizacionesGruaAdmin('${escaparHtml(s.id)}')">Ver</button></td></tr>`;
+  }).join("");
+}
+
+window.verCotizacionesGruaAdmin=id=>{
+  const s=state.services.find(x=>x.id===id); if(!s)return; const g=s.raw?.grua||{}; const quotes=state.towQuotes.get(id)||[];
+  const propuestas=quotes.length?quotes.sort((a,b)=>Number(a.precio||0)-Number(b.precio||0)).map(q=>`<article><b>${escaparHtml(q.nombreProveedor||q.proveedorUid||"Proveedor")}</b> · ${formatearDinero(q.precio)}<small>ETA ${escaparHtml(q.tiempoEstimadoMinutos||"-")} min · ${escaparHtml(q.estado||"enviada")}</small>${q.observaciones?`<p>${escaparHtml(q.observaciones)}</p>`:""}</article>`).join(""):'<p>Aún no hay cotizaciones.</p>';
+  openModal(`Cotizaciones ${s.folio}`,`<p><b>Categoría:</b> ${escaparHtml(g.categoria||"-")}</p><p><b>Condición:</b> ${escaparHtml(g.condicion||"-")}</p><p><b>Liberación:</b> ${escaparHtml(g.liberacion||"-")}</p><p><b>Destino:</b> ${escaparHtml(g.destino||s.raw?.destino||"-")}</p><p><b>Carga:</b> ${g.esVehiculoCarga?escaparHtml(`${g.estadoCarga||""} ${g.tipoCarga||""} ${g.pesoCargaAproximado||""}`.trim()):"No"}</p><hr style="border:0;border-top:1px solid #29435c"><div class="quoteDetail">${propuestas}</div>`);
+};
+
 window.addEventListener("beforeunload",() => {
   unsubscribeServices?.();
   unsubscribeProviders?.();
   unsubscribeClients?.();
+  towQuoteUnsubscribers.forEach(unsub=>unsub?.());
+  towQuoteUnsubscribers.clear();
   detenerListenersVehiculos();
 });
 
