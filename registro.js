@@ -65,6 +65,25 @@ const numeroMembresiaInput =
   document.getElementById("numeroMembresia");
 
 /* =========================================
+   AFILIACIÓN MONTEC / ACME
+========================================= */
+
+const afiliacionGremialInput =
+  document.getElementById("afiliacionGremial");
+
+const montecNumberBlock =
+  document.getElementById("montecNumberBlock");
+
+const acmeNumberBlock =
+  document.getElementById("acmeNumberBlock");
+
+const numeroEstampaMontecInput =
+  document.getElementById("numeroEstampaMontec");
+
+const numeroEstampaAcmeInput =
+  document.getElementById("numeroEstampaAcme");
+
+/* =========================================
    DATOS PERSONALES
 ========================================= */
 
@@ -158,6 +177,12 @@ const errores = {
   numeroMembresia:
     document.getElementById("numeroMembresiaError"),
 
+  numeroEstampaMontec:
+    document.getElementById("numeroEstampaMontecError"),
+
+  numeroEstampaAcme:
+    document.getElementById("numeroEstampaAcmeError"),
+
   nombre:
     document.getElementById("nombreError"),
 
@@ -234,6 +259,46 @@ function seleccionarTipoRegistro(esMiembro) {
     limpiarError(
       numeroMembresiaInput,
       errores.numeroMembresia
+    );
+  }
+}
+
+afiliacionGremialInput?.addEventListener(
+  "change",
+  actualizarCamposAfiliacion
+);
+
+function actualizarCamposAfiliacion() {
+  const afiliacion =
+    afiliacionGremialInput?.value || "ninguna";
+
+  const mostrarMontec =
+    afiliacion === "montec" || afiliacion === "ambos";
+
+  const mostrarAcme =
+    afiliacion === "acme" || afiliacion === "ambos";
+
+  if (montecNumberBlock) {
+    montecNumberBlock.hidden = !mostrarMontec;
+  }
+
+  if (acmeNumberBlock) {
+    acmeNumberBlock.hidden = !mostrarAcme;
+  }
+
+  if (!mostrarMontec && numeroEstampaMontecInput) {
+    numeroEstampaMontecInput.value = "";
+    limpiarError(
+      numeroEstampaMontecInput,
+      errores.numeroEstampaMontec
+    );
+  }
+
+  if (!mostrarAcme && numeroEstampaAcmeInput) {
+    numeroEstampaAcmeInput.value = "";
+    limpiarError(
+      numeroEstampaAcmeInput,
+      errores.numeroEstampaAcme
     );
   }
 }
@@ -380,6 +445,19 @@ function obtenerDatosFormulario() {
           )
         : "",
 
+    afiliacionGremial:
+      afiliacionGremialInput?.value || "ninguna",
+
+    numeroEstampaMontec:
+      numeroEstampaMontecInput?.value
+        .trim()
+        .toUpperCase() || "",
+
+    numeroEstampaAcme:
+      numeroEstampaAcmeInput?.value
+        .trim()
+        .toUpperCase() || "",
+
     nombre:
       limpiarTexto(nombreInput.value),
 
@@ -494,8 +572,7 @@ function normalizarEstadoMembresia(valor) {
     active: "activa",
     asignada: "activa",
     asignado: "activa",
-    disponible: "pendiente_activacion",
-    pendiente: "pendiente_activacion",
+    disponible: "activa",
     vigente: "activa",
     cancelado: "cancelada",
     vencido: "vencida"
@@ -528,13 +605,6 @@ function validarDisponibilidadMembresia(membresia, uidUsuario) {
     throw crearErrorPersonalizado(
       "membership/expired",
       "Esta membresía está vencida."
-    );
-  }
-
-  if (estado === "suspendida") {
-    throw crearErrorPersonalizado(
-      "membership/suspended",
-      "Esta membresía está suspendida."
     );
   }
 }
@@ -573,24 +643,26 @@ async function registrarClienteConMembresia(
       }
 
       const membresia = membresiaSnap.data();
-      validarDisponibilidadMembresia(membresia, usuario.uid);
 
+      validarDisponibilidadMembresia(
+        membresia,
+        usuario.uid
+      );
+
+      /*
+        Si el folio fue generado por Admin, llega como:
+        estadoMembresia = "pendiente_activacion"
+        fechaInicio = null
+        fechaFin = null
+
+        Al usarlo por primera vez se activa aquí mismo.
+      */
       const uidVinculado = String(
         membresia.uidUsuario || ""
       ).trim();
 
-      const estadoAnterior = normalizarEstadoMembresia(
-        membresia.estadoMembresia ||
-        membresia.estado ||
-        "pendiente_activacion"
-      );
-
       const esPrimeraActivacion =
-        !uidVinculado &&
-        [
-          "pendiente_activacion",
-          "activa"
-        ].includes(estadoAnterior);
+        uidVinculado === "";
 
       let fechaInicio =
         membresia.fechaInicio ||
@@ -603,23 +675,31 @@ async function registrarClienteConMembresia(
         membresia.vigencia ||
         null;
 
-      if (esPrimeraActivacion || !fechaInicio || !fechaFin) {
+      if (
+        esPrimeraActivacion ||
+        !fechaInicio ||
+        !fechaFin
+      ) {
         const inicio = new Date();
         const fin = new Date(inicio);
 
-        const meses = Number(
-          membresia.duracionMeses ||
+        const meses =
+          Number(membresia.duracionMeses) ||
           (
-            String(membresia.plan || "").toLowerCase() === "anual"
-              ? 12
+            String(membresia.plan || "").toLowerCase() === "mensual"
+              ? 1
               : 12
-          )
-        ) || 12;
+          );
 
-        fin.setMonth(fin.getMonth() + meses);
+        fin.setMonth(
+          fin.getMonth() + meses
+        );
 
-        fechaInicio = Timestamp.fromDate(inicio);
-        fechaFin = Timestamp.fromDate(fin);
+        fechaInicio =
+          Timestamp.fromDate(inicio);
+
+        fechaFin =
+          Timestamp.fromDate(fin);
       }
 
       const estadoMembresia = "activa";
@@ -650,26 +730,62 @@ async function registrarClienteConMembresia(
       transaction.set(
         membresiaRef,
         {
-          numeroMembresia: datos.numeroMembresia,
-          uidUsuario: usuario.uid,
-          correo: datos.email,
-          nombreRegistro: datos.nombre,
-          telefonoRegistro: datos.telefono,
-          tipoCliente: datos.tipoCliente,
-          estado: "asignada",
-          estadoMembresia: "activa",
-          puedeUsarAlertas: true,
-          fechaVinculacion: serverTimestamp(),
+          numeroMembresia:
+            datos.numeroMembresia,
+
+          uidUsuario:
+            usuario.uid,
+
+          correo:
+            datos.email,
+
+          nombreRegistro:
+            datos.nombre,
+
+          telefonoRegistro:
+            datos.telefono,
+
+          tipoCliente:
+            datos.tipoCliente,
+
+          estado:
+            "asignada",
+
+          estadoMembresia:
+            "activa",
+
+          puedeUsarAlertas:
+            true,
+
+          fechaVinculacion:
+            serverTimestamp(),
+
           fechaInicio,
           fechaFin,
-          inicioVigencia: fechaInicio,
-          finVigencia: fechaFin,
-          vigencia: fechaFin,
-          marcaRegistro: datos.marca,
-          subMarcaRegistro: datos.subMarca,
-          colorRegistro: datos.color,
-          placasRegistro: datos.placas,
-          serieRegistro: datos.serie
+
+          inicioVigencia:
+            fechaInicio,
+
+          finVigencia:
+            fechaFin,
+
+          vigencia:
+            fechaFin,
+
+          marcaRegistro:
+            datos.marca,
+
+          subMarcaRegistro:
+            datos.subMarca,
+
+          colorRegistro:
+            datos.color,
+
+          placasRegistro:
+            datos.placas,
+
+          serieRegistro:
+            datos.serie
         },
         { merge: true }
       );
@@ -762,6 +878,26 @@ function construirPerfilUsuario(
     puedeUsarAlertas:
       membresia.puedeUsarAlertas,
 
+    afiliacionGremial:
+      datos.afiliacionGremial || "ninguna",
+
+    afiliaciones: {
+      montec: {
+        activo:
+          datos.afiliacionGremial === "montec" ||
+          datos.afiliacionGremial === "ambos",
+        numeroEstampa:
+          datos.numeroEstampaMontec || ""
+      },
+      acme: {
+        activo:
+          datos.afiliacionGremial === "acme" ||
+          datos.afiliacionGremial === "ambos",
+        numeroEstampa:
+          datos.numeroEstampaAcme || ""
+      }
+    },
+
     marca:
       datos.marca,
 
@@ -834,6 +970,34 @@ function validarFormulario(datos) {
 
       valido = false;
     }
+  }
+
+  if (
+    (datos.afiliacionGremial === "montec" ||
+      datos.afiliacionGremial === "ambos") &&
+    !datos.numeroEstampaMontec
+  ) {
+    marcarError(
+      numeroEstampaMontecInput,
+      errores.numeroEstampaMontec,
+      "Escribe tu número de estampa MONTEC."
+    );
+
+    valido = false;
+  }
+
+  if (
+    (datos.afiliacionGremial === "acme" ||
+      datos.afiliacionGremial === "ambos") &&
+    !datos.numeroEstampaAcme
+  ) {
+    marcarError(
+      numeroEstampaAcmeInput,
+      errores.numeroEstampaAcme,
+      "Escribe tu número de estampa ACME."
+    );
+
+    valido = false;
   }
 
   if (!datos.nombre) {
@@ -1068,6 +1232,14 @@ function limpiarTodosLosErrores() {
       errores.numeroMembresia
     ],
     [
+      numeroEstampaMontecInput,
+      errores.numeroEstampaMontec
+    ],
+    [
+      numeroEstampaAcmeInput,
+      errores.numeroEstampaAcme
+    ],
+    [
       nombreInput,
       errores.nombre
     ],
@@ -1146,6 +1318,14 @@ function enfocarPrimerError() {
   [
     numeroMembresiaInput,
     errores.numeroMembresia
+  ],
+  [
+    numeroEstampaMontecInput,
+    errores.numeroEstampaMontec
+  ],
+  [
+    numeroEstampaAcmeInput,
+    errores.numeroEstampaAcme
   ],
   [
     nombreInput,
@@ -1257,6 +1437,20 @@ numeroMembresiaInput?.addEventListener(
 
     numeroMembresiaInput.value =
       valor.slice(0, 10);
+  }
+);
+
+[numeroEstampaMontecInput, numeroEstampaAcmeInput].forEach(
+  campo => {
+    campo?.addEventListener(
+      "input",
+      () => {
+        campo.value = campo.value
+          .toUpperCase()
+          .replace(/\s+/g, " ")
+          .slice(0, 40);
+      }
+    );
   }
 );
 
@@ -1583,6 +1777,7 @@ window.addEventListener(
   "DOMContentLoaded",
   () => {
     seleccionarTipoRegistro(true);
+    actualizarCamposAfiliacion();
     nombreInput?.focus();
   }
 );
