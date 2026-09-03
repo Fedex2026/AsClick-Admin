@@ -158,6 +158,21 @@ function formatearDinero(valor){
   }).format(Number(valor) || 0);
 }
 
+function convertirImporteANumero(valor){
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : 0;
+  }
+
+  if (valor == null) return 0;
+
+  const limpio = String(valor)
+    .replace(/[^0-9.-]/g,"")
+    .trim();
+
+  const numero = Number(limpio);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
 function obtenerNombreCliente(datos = {}){
   return texto(
     datos.cliente?.nombre ||
@@ -180,13 +195,29 @@ function obtenerNombreProveedor(datos = {}){
 function convertirSolicitud(doc){
   const datos = doc.data();
 
-  const fecha =
+  const fechaCreacion =
     datos.creadoEn ||
     datos.fechaCreacion ||
     datos.fechaSolicitud ||
     datos.fecha ||
-    datos.actualizadoEn ||
     null;
+
+  const estadoNormalizado = normalizarEstadoServicio(datos.estado);
+
+  const fechaFinalizacion =
+    datos.fechaFinalizacion ||
+    datos.finalizadoEn ||
+    datos.fechaTermino ||
+    datos.fechaFinalizado ||
+    (
+      estadoNormalizado === "Finalizado"
+        ? (
+            datos.actualizadoEn ||
+            datos.fechaActualizacion ||
+            fechaCreacion
+          )
+        : null
+    );
 
   const tipo =
     datos.servicio?.tipo ||
@@ -195,6 +226,17 @@ function convertirSolicitud(doc){
     datos.servicio ||
     "";
 
+  const monto =
+    convertirImporteANumero(
+      datos.total ??
+      datos.importeTotal ??
+      datos.precioCliente ??
+      datos.costoCliente ??
+      datos.monto ??
+      datos.costoServicio ??
+      0
+    );
+
   return {
     id: doc.id,
     raw: datos,
@@ -202,19 +244,19 @@ function convertirSolicitud(doc){
     cliente: obtenerNombreCliente(datos),
     servicio: normalizarTipoServicio(tipo),
     proveedor: obtenerNombreProveedor(datos),
-    estado: normalizarEstadoServicio(datos.estado),
+    uidProveedor: texto(
+      datos.asignacion?.uidProveedor ||
+      datos.uidProveedor ||
+      datos.proveedorId,
+      ""
+    ),
+    estado: estadoNormalizado,
     estadoRaw: datos.estado || "",
-    hora: formatearHora(fecha),
-    fecha,
-    monto:
-      Number(
-        datos.total ||
-        datos.importeTotal ||
-        datos.precioCliente ||
-        datos.costoCliente ||
-        datos.monto ||
-        0
-      ) || 0
+    hora: formatearHora(fechaCreacion),
+    fecha: fechaCreacion,
+    fechaCreacion,
+    fechaFinalizacion,
+    monto
   };
 }
 
@@ -390,6 +432,40 @@ function reconstruirAutorizaciones(){
     );
 }
 
+
+function servicioMantieneProveedorOcupado(servicio){
+  if (!servicio?.uidProveedor) return false;
+
+  return [
+    "Asignado",
+    "En camino",
+    "En sitio"
+  ].includes(servicio.estado);
+}
+
+function obtenerUidsProveedoresOcupados(){
+  return new Set(
+    state.services
+      .filter(servicioMantieneProveedorOcupado)
+      .map(s => s.uidProveedor)
+      .filter(Boolean)
+  );
+}
+
+function estadoProveedorEnTiempoReal(proveedor){
+  const ocupados = obtenerUidsProveedoresOcupados();
+
+  if (ocupados.has(proveedor.id)) {
+    return "Ocupado";
+  }
+
+  if (proveedor.status === "Ocupado") {
+    return "Disponible";
+  }
+
+  return proveedor.status;
+}
+
 function recalcularKpis(){
   const contarEstado = estado =>
     state.services.filter(servicio => servicio.estado === estado).length;
@@ -399,20 +475,45 @@ function recalcularKpis(){
   kpiTopData[2][1] = String(contarEstado("En camino"));
   kpiTopData[3][1] = String(contarEstado("En sitio"));
   kpiTopData[4][1] = String(
-    state.services.filter(s => s.estado === "Finalizado" && esHoy(s.fecha)).length
+    state.services.filter(
+      s => s.estado === "Finalizado" && esHoy(s.fechaFinalizacion || s.fecha)
+    ).length
   );
   kpiTopData[5][1] = String(
-    state.services.filter(s => s.estado === "Cancelado" && esHoy(s.fecha)).length
+    state.services.filter(
+      s => s.estado === "Cancelado" &&
+      esHoy(
+        s.raw?.fechaCancelacion ||
+        s.raw?.canceladoEn ||
+        s.raw?.actualizadoEn ||
+        s.fecha
+      )
+    ).length
   );
 
-  const disponibles = state.providers.filter(p => p.status === "Disponible").length;
-  const ocupados = state.providers.filter(p => p.status === "Ocupado").length;
+  const uidsOcupados = obtenerUidsProveedoresOcupados();
+  const ocupados = state.providers.filter(p => uidsOcupados.has(p.id)).length;
+  const disponibles = state.providers.filter(
+    p =>
+      !uidsOcupados.has(p.id) &&
+      (
+        p.status === "Disponible" ||
+        p.status === "Ocupado"
+      )
+  ).length;
   const conectados = disponibles + ocupados;
   const membresias = state.clients.filter(c => c.hasMembership).length;
 
   const ingresosHoy = state.services
-    .filter(s => s.estado === "Finalizado" && esHoy(s.fecha))
-    .reduce((total,s) => total + (Number(s.monto) || 0),0);
+    .filter(
+      s =>
+        s.estado === "Finalizado" &&
+        esHoy(s.fechaFinalizacion || s.fecha)
+    )
+    .reduce(
+      (total,s) => total + (Number(s.monto) || 0),
+      0
+    );
 
   kpiBottomData[0][1] = String(disponibles);
   kpiBottomData[1][1] = String(ocupados);
@@ -426,7 +527,7 @@ function recalcularKpis(){
   kpiBottomData[2].sub = "en total";
   kpiBottomData[3].sub = "membresías detectadas";
   kpiBottomData[4].sub = "se conectará después";
-  kpiBottomData[5].sub = ingresosHoy > 0 ? "servicios finalizados hoy" : "sin importes registrados";
+  kpiBottomData[5].sub = ingresosHoy > 0 ? "servicios finalizados hoy" : "sin ingresos finalizados hoy";
 
   const badge = document.getElementById("authBadge");
   if (badge) badge.textContent = String(state.authorizations.length);
@@ -597,7 +698,12 @@ function renderProviders(){
   const destacados = document.getElementById("featuredProviders");
   const grid = document.getElementById("providersGrid");
 
-  const ordenados = [...state.providers].sort((a,b) => {
+  const proveedoresTiempoReal = state.providers.map(p => ({
+    ...p,
+    status: estadoProveedorEnTiempoReal(p)
+  }));
+
+  const ordenados = [...proveedoresTiempoReal].sort((a,b) => {
     if (a.status === "Disponible" && b.status !== "Disponible") return -1;
     if (b.status === "Disponible" && a.status !== "Disponible") return 1;
     return Number(b.rating) - Number(a.rating);
@@ -791,7 +897,10 @@ function obtenerIngresosUltimos7Dias(){
   state.services.forEach(servicio => {
     if (servicio.estado !== "Finalizado") return;
 
-    const ms = obtenerMilisegundos(servicio.fecha);
+    const ms = obtenerMilisegundos(
+      servicio.fechaFinalizacion ||
+      servicio.fecha
+    );
     if (!ms) return;
 
     const fechaServicio = new Date(ms);
