@@ -19,6 +19,8 @@ let firestoreServerTimestamp = null;
 let firestoreSetDoc = null;
 let firestoreWriteBatch = null;
 let firestoreTimestamp = null;
+let firestoreGetDocs = null;
+let firestoreRunTransaction = null;
 
 let unsubscribeServices = null;
 let unsubscribeProviders = null;
@@ -2248,6 +2250,8 @@ async function iniciarFirebaseAdmin(){
     firestoreSetDoc = firestoreModule.setDoc;
     firestoreWriteBatch = firestoreModule.writeBatch;
     firestoreTimestamp = firestoreModule.Timestamp;
+    firestoreGetDocs = firestoreModule.getDocs;
+    firestoreRunTransaction = firestoreModule.runTransaction;
 
     if (!db) {
       throw new Error("firebase-config.js no exporta db.");
@@ -2258,6 +2262,7 @@ async function iniciarFirebaseAdmin(){
     escucharClientes();
     escucharProveedores();
     escucharServicios();
+    escucharMembresias();
   } catch (error) {
     console.error("No fue posible iniciar Firebase en Admin:",error);
 
@@ -2726,28 +2731,130 @@ function renderMemberships(){
   renderMembershipKpis();
 }
 
-function siguienteNumeroMembresia(cantidad = 1){
+function extraerConsecutivoMembresia(valor){
+  const match = String(valor || "")
+    .trim()
+    .toUpperCase()
+    .match(/^ASC-(\d{6})$/);
+
+  return match ? Number(match[1]) : null;
+}
+
+async function obtenerMayorMembresiaExistente(){
+  if (!firestoreGetDocs) {
+    throw new Error("No se pudo leer la colección de membresías.");
+  }
+
+  const snapshot = await firestoreGetDocs(
+    firestoreCollection(db,"membresias")
+  );
+
   let maximo = 0;
 
-  state.memberships.forEach(m => {
-    const valores = [
-      m.id,
-      m.numeroMembresia
-    ];
+  snapshot.docs.forEach(documento => {
+    const datos = documento.data();
 
-    valores.forEach(valor => {
-      const match = String(valor || "").match(/^ASC-(\d{6})$/i);
-      if (!match) return;
+    [
+      documento.id,
+      datos.numeroMembresia
+    ].forEach(valor => {
+      const numero = extraerConsecutivoMembresia(valor);
 
-      maximo = Math.max(
-        maximo,
-        Number(match[1]) || 0
-      );
+      if (numero != null) {
+        maximo = Math.max(maximo,numero);
+      }
     });
   });
 
-  return Array.from({length:cantidad},(_,i) =>
-    `ASC-${String(maximo + i + 1).padStart(6,"0")}`
+  return maximo;
+}
+
+async function reservarMembresiasNuevas(cantidad,plan){
+  if (!firestoreRunTransaction) {
+    throw new Error("Firebase no tiene disponible la transacción de seguridad.");
+  }
+
+  /*
+    La pantalla se conserva exactamente igual.
+    Solo cambiamos la forma de crear los folios.
+
+    1. Buscamos el número más alto REAL en Firestore.
+    2. Dentro de una transacción comprobamos cada documento candidato.
+    3. Solo se crea si NO existe.
+    4. Si existe, avanzamos al siguiente.
+    5. Al ser una transacción, Firestore vuelve a intentar si otro Admin
+       crea el mismo folio al mismo tiempo.
+    6. Jamás se usa update/merge sobre una membresía existente.
+  */
+  const mayorExistente = await obtenerMayorMembresiaExistente();
+
+  return await firestoreRunTransaction(
+    db,
+    async transaction => {
+      const numeros = [];
+      const referencias = [];
+
+      let candidato = mayorExistente + 1;
+
+      while (numeros.length < cantidad) {
+        if (candidato > 999999) {
+          throw new Error("Se agotó el rango de números de membresía.");
+        }
+
+        const numero =
+          `ASC-${String(candidato).padStart(6,"0")}`;
+
+        const ref = firestoreDoc(
+          db,
+          "membresias",
+          numero
+        );
+
+        const snap = await transaction.get(ref);
+
+        if (!snap.exists()) {
+          numeros.push(numero);
+          referencias.push(ref);
+        }
+
+        candidato += 1;
+      }
+
+      referencias.forEach((ref,index) => {
+        const numero = numeros[index];
+
+        transaction.set(
+          ref,
+          {
+            numeroMembresia: numero,
+            estado: "disponible",
+            estadoMembresia: "pendiente_activacion",
+            plan,
+            duracionMeses: 12,
+
+            uidUsuario: "",
+            nombreRegistro: "",
+            telefonoRegistro: "",
+            correo: "",
+            tipoCliente: "",
+
+            /*
+              Como antes: el folio se entrega primero.
+              La vigencia comienza cuando el cliente lo usa al registrarse.
+            */
+            fechaInicio: null,
+            fechaFin: null,
+            inicioVigencia: null,
+            finVigencia: null,
+
+            creadoEn: firestoreServerTimestamp(),
+            creadoPorAdmin: true
+          }
+        );
+      });
+
+      return numeros;
+    }
   );
 }
 
@@ -2786,10 +2893,15 @@ window.abrirGeneradorMembresias = () => {
 };
 
 window.generarMembresiasAdmin = async () => {
-  if (!firebaseReady || !firestoreWriteBatch || !firestoreDoc) {
+  if (
+    !firebaseReady ||
+    !firestoreDoc ||
+    !firestoreGetDocs ||
+    !firestoreRunTransaction
+  ) {
     openModal(
       "Firebase no está listo",
-      "<p>No se pudo iniciar el generador de membresías. Actualiza la página e inténtalo de nuevo.</p>"
+      "<p>No se pudo iniciar el generador de membresías. Actualiza la página e inténtalo nuevamente.</p>"
     );
     return;
   }
@@ -2808,51 +2920,25 @@ window.generarMembresiasAdmin = async () => {
     document.getElementById("membershipGeneratePlan")?.value ||
     "anual";
 
-  const numeros = siguienteNumeroMembresia(cantidad);
+  const confirmar = window.confirm(
+    `¿Generar ${cantidad} membresía${cantidad === 1 ? "" : "s"} nueva${cantidad === 1 ? "" : "s"}? Las ya existentes NO serán modificadas.`
+  );
+
+  if (!confirmar) return;
 
   try {
-    const batch = firestoreWriteBatch(db);
-
-    numeros.forEach(numero => {
-      const ref = firestoreDoc(
-        db,
-        "membresias",
-        numero
-      );
-
-      batch.set(
-        ref,
-        {
-          numeroMembresia: numero,
-          estado: "disponible",
-          estadoMembresia: "pendiente_activacion",
-          plan,
-          duracionMeses: 12,
-          uidUsuario: "",
-          nombreRegistro: "",
-          telefonoRegistro: "",
-          correo: "",
-          tipoCliente: "",
-          fechaInicio: null,
-          fechaFin: null,
-          inicioVigencia: null,
-          finVigencia: null,
-          creadoEn: firestoreServerTimestamp(),
-          creadoPorAdmin: true
-        },
-        { merge: false }
-      );
-    });
-
-    await batch.commit();
+    const numeros = await reservarMembresiasNuevas(
+      cantidad,
+      plan
+    );
 
     openModal(
       "Membresías generadas",
       `
-        <p>Se generaron <b>${numeros.length}</b> membresías correctamente.</p>
+        <p>Se generaron <b>${numeros.length}</b> membresías nuevas.</p>
         <p><b>Primera:</b> ${escaparHtml(numeros[0])}</p>
         <p><b>Última:</b> ${escaparHtml(numeros[numeros.length - 1])}</p>
-        <p>Ya puedes entregar cualquiera de estos folios a un cliente.</p>
+        <p><b>Ninguna membresía existente fue modificada.</b></p>
       `
     );
   } catch (error) {
@@ -2860,7 +2946,10 @@ window.generarMembresiasAdmin = async () => {
 
     openModal(
       "No fue posible generar",
-      `<p>Firebase rechazó la creación.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+      `
+        <p><b>No se modificó ninguna membresía existente.</b></p>
+        <p>Detalle: ${escaparHtml(error?.message || String(error))}</p>
+      `
     );
   }
 };
