@@ -175,7 +175,44 @@
         <div class="panel"><div id="fullMap"></div></div>
       </section>
 
-      <section class="pageSection placeholder" id="section-vehiculos"><h2>Vehículos</h2><p>Control de vehículos, membresía aplicada y autorizaciones.</p></section>
+      <section class="pageSection" id="section-vehiculos">
+        <div class="contentHeader">
+          <div>
+            <h2>Vehículos</h2>
+            <p>Control de vehículos, membresía aplicada y autorizaciones.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="filters">
+            <input id="vehicleSearch" type="search" placeholder="Buscar cliente, placas, VIN o membresía">
+            <select id="vehicleStatusFilter">
+              <option value="">Todos los estados</option>
+              <option value="activo">Activo</option>
+              <option value="pendiente_autorizacion">Pendiente de autorización</option>
+              <option value="sin_membresia">Sin membresía</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+          </div>
+
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Vehículo</th>
+                  <th>Placas</th>
+                  <th>VIN / Serie</th>
+                  <th>Membresía</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="vehiclesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
       <section class="pageSection placeholder" id="section-membresias"><h2>Membresías</h2><p>Altas, renovaciones, vigencias, suspensiones y cancelaciones.</p></section>
       <section class="pageSection placeholder" id="section-gremios"><h2>MONTEC / ACME</h2><p>Validación de afiliaciones y números de estampa.</p></section>
       <section class="pageSection placeholder" id="section-pagos"><h2>Pagos</h2><p>Ingresos, costos de proveedor, comisión y utilidad.</p></section>
