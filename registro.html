@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Crear cuenta | AS CLICK</title>
+
+  <link rel="stylesheet" href="registro.css" />
+
+  <link rel="icon" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+
+  <meta name="theme-color" content="#052b5c" />
+</head>
+
+<body>
+
+  <main class="registerPage">
+
+    <!-- LADO IZQUIERDO -->
+    <section class="registerHero">
+
+      <div class="heroOverlay"></div>
+
+      <div class="heroContent">
+
+        <div class="brand">
+
+          <div class="brandMark">
+            AS
+          </div>
+
+          <div>
+            <h1>AS CLICK</h1>
+            <p>ASISTENCIA VIAL</p>
+          </div>
+
+        </div>
+
+        <div class="heroText">
+
+          <span class="heroBadge">
+            REGISTRA TU CUENTA
+          </span>
+
+          <h2>
+            Tu vehículo y asistencia,
+            siempre disponibles.
+          </h2>
+
+          <p>
+            Crea tu cuenta para solicitar ajustador, abogado,
+            auxilio vial o grúa desde una sola plataforma.
+          </p>
+
+        </div>
+
+        <div class="heroFeatures">
+
+          <div class="heroFeature">
+
+            <span>✓</span>
+
+            <div>
+              <b>Registro con membresía</b>
+
+              <small>
+                Ingresa el número proporcionado por AS CLICK.
+              </small>
+            </div>
+
+          </div>
+
+          <div class="heroFeature">
+
+            <span>✓</span>
+
+            <div>
+              <b>Registro sin membresía</b>
+
+              <small>
+                Solicita servicios con tarifa de público general.
+              </small>
+            </div>
+
+          </div>
+
+          <div class="heroFeature">
+
+            <span>✓</span>
+
+            <div>
+              <b>Datos de tu vehículo</b>
+
+              <small>
+                Marca, submarca, placas, color y número de serie.
+              </small>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="heroEmergency">
+
+          <span>🚨</span>
+
+          <div>
+            <b>Alertas exclusivas para miembros</b>
+
+            <small>
+              Robo y montachoques están disponibles únicamente
+              para miembros activos.
+            </small>
+          </div>
+
+        </div>
+
+        <footer class="heroFooter">
+          <span>Atención 24/7</span>
+          <span>•</span>
+          <span>AS CLICK México</span>
+        </footer>
+
+      </div>
+
+    </section>
+
+    <!-- FORMULARIO -->
+    <section class="registerPanel">
+
+      <div class="registerCard">
+
+        <div class="mobileBrand">
+
+          <div class="brandMark">
+            AS
+          </div>
+
+          <div>
+            <h1>AS CLICK</h1>
+            <p>ASISTENCIA VIAL</p>
+          </div>
+
+        </div>
+
+        <header class="registerHeader">
+
+          <span class="welcomeTag">
+            NUEVA CUENTA
+          </span>
+
+          <h2>Crear cuenta</h2>
+
+          <p>
+            Registra tus datos personales, acceso y vehículo.
+          </p>
+
+        </header>
+
+        <div
+          id="registerMessage"
+          class="registerMessage"
+          role="alert"
+          aria-live="polite"
+        ></div>
+
+        <form
+          id="registerForm"
+          class="registerForm"
+          novalidate
+        >
+
+          <!-- TIPO DE REGISTRO -->
+          <section class="formSection">
+
+            <div class="sectionHeading">
+              <span>1</span>
+
+              <div>
+                <b>Tipo de registro</b>
+                <small>Indica si cuentas con membresía.</small>
+              </div>
+            </div>
+
+            <div class="membershipOptions">
+
+              <button
+                type="button"
+                class="membershipOption active"
+                id="optionWithMembership"
+                data-value="si"
+              >
+                <span>✓</span>
+
+                <div>
+                  <b>Tengo membresía</b>
+                  <small>Tarifa preferencial y alertas.</small>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="membershipOption"
+                id="optionWithoutMembership"
+                data-value="no"
+              >
+                <span>👤</span>
+
+                <div>
+                  <b>No tengo membresía</b>
+                  <small>Tarifa de público general.</small>
+                </div>
+              </button>
+
+            </div>
+
+            <input
+              type="hidden"
+              id="tieneMembresia"
+              value="si"
+            />
+
+            <div
+              class="membershipNumberBlock"
+              id="membershipNumberBlock"
+            >
+
+              <label for="numeroMembresia">
+                Número de membresía
+              </label>
+
+              <div class="inputWrapper">
+
+                <span class="inputIcon">
+                  🪪
+                </span>
+
+                <input
+                  type="text"
+                  id="numeroMembresia"
+                  name="numeroMembresia"
+                  placeholder="Ej. ASC-000245"
+                  autocomplete="off"
+                />
+
+              </div>
+
+              <small
+                id="numeroMembresiaError"
+                class="fieldError"
+              ></small>
+
+              <p class="membershipHelp">
+                Escribe el número proporcionado por AS CLICK
+                después de confirmar tu membresía.
+              </p>
+
+            </div>
+
+            <div
+              class="nonMemberNotice"
+              id="nonMemberNotice"
+              hidden
+            >
+
+              <span>ℹ️</span>
+
+              <div>
+                <b>Registro sin membresía</b>
+
+                <p>
+                  Podrás solicitar ajustador, abogado, auxilio vial
+                  y grúa con tarifa de público general. No tendrás
+                  acceso a las alertas de robo y montachoques.
+                </p>
+              </div>
+
+            </div>
+
+            <!-- AFILIACIÓN MONTEC / ACME -->
+            <div class="formGroup fullWidth" style="margin-top: 18px;">
+
+              <label for="afiliacionGremial">
+                Afiliación gremial
+              </label>
+
+              <div class="selectWrapper">
+
+                <span class="inputIcon">
+                  🤝
+                </span>
+
+                <select
+                  id="afiliacionGremial"
+                  name="afiliacionGremial"
+                >
+                  <option value="ninguna">
+                    No pertenezco a ninguna
+                  </option>
+
+                  <option value="montec">
+                    MONTEC
+                  </option>
+
+                  <option value="acme">
+                    ACME
+                  </option>
+
+                  <option value="ambos">
+                    MONTEC y ACME
+                  </option>
+                </select>
+
+              </div>
+
+              <small class="fieldError"></small>
+
+              <p class="membershipHelp">
+                Si estás agremiado, selecciona MONTEC, ACME o ambas e ingresa tu número de estampa.
+              </p>
+
+            </div>
+
+            <div
+              class="formGroup fullWidth"
+              id="montecNumberBlock"
+              hidden
+            >
+
+              <label for="numeroEstampaMontec">
+                Número de estampa MONTEC
+              </label>
+
+              <div class="inputWrapper">
+
+                <span class="inputIcon">
+                  🪪
+                </span>
+
+                <input
+                  type="text"
+                  id="numeroEstampaMontec"
+                  name="numeroEstampaMontec"
+                  placeholder="Número de estampa MONTEC"
+                  autocomplete="off"
+                />
+
+              </div>
+
+              <small
+                id="numeroEstampaMontecError"
+                class="fieldError"
+              ></small>
+
+            </div>
+
+            <div
+              class="formGroup fullWidth"
+              id="acmeNumberBlock"
+              hidden
+            >
+
+              <label for="numeroEstampaAcme">
+                Número de estampa ACME
+              </label>
+
+              <div class="inputWrapper">
+
+                <span class="inputIcon">
+                  🪪
+                </span>
+
+                <input
+                  type="text"
+                  id="numeroEstampaAcme"
+                  name="numeroEstampaAcme"
+                  placeholder="Número de estampa ACME"
+                  autocomplete="off"
+                />
+
+              </div>
+
+              <small
+                id="numeroEstampaAcmeError"
+                class="fieldError"
+              ></small>
+
+            </div>
+
+          </section>
+
+          <!-- DATOS PERSONALES -->
+          <section class="formSection">
+
+            <div class="sectionHeading">
+              <span>2</span>
+
+              <div>
+                <b>Datos personales</b>
+                <small>Información del titular de la cuenta.</small>
+              </div>
+            </div>
+
+            <div class="formGrid">
+
+              <div class="formGroup fullWidth">
+
+                <label for="nombre">
+                  Nombre completo
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    👤
+                  </span>
+
+                  <input
+                    type="text"
+                    id="nombre"
+                    name="nombre"
+                    placeholder="Nombre y apellidos"
+                    autocomplete="name"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="nombreError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="telefono">
+                  Teléfono
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    ☎
+                  </span>
+
+                  <input
+                    type="tel"
+                    id="telefono"
+                    name="telefono"
+                    placeholder="10 dígitos"
+                    autocomplete="tel"
+                    inputmode="numeric"
+                    maxlength="10"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="telefonoError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="tipoCliente">
+                  Tipo de cliente
+                </label>
+
+                <div class="selectWrapper">
+
+                  <span class="inputIcon">
+                    ▣
+                  </span>
+
+                  <select
+                    id="tipoCliente"
+                    name="tipoCliente"
+                    required
+                  >
+                    <option value="">
+                      Seleccionar
+                    </option>
+
+                    <option value="particular">
+                      Particular
+                    </option>
+
+                    <option value="servicio_publico">
+                      Servicio público
+                    </option>
+                  </select>
+
+                </div>
+
+                <small
+                  id="tipoClienteError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+            </div>
+
+          </section>
+
+          <!-- DATOS DE ACCESO -->
+          <section class="formSection">
+
+            <div class="sectionHeading">
+              <span>3</span>
+
+              <div>
+                <b>Datos de acceso</b>
+                <small>Correo y contraseña para iniciar sesión.</small>
+              </div>
+            </div>
+
+            <div class="formGrid">
+
+              <div class="formGroup fullWidth">
+
+                <label for="email">
+                  Correo electrónico
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    ✉
+                  </span>
+
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="correo@ejemplo.com"
+                    autocomplete="email"
+                    inputmode="email"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="emailError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="password">
+                  Contraseña
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    🔒
+                  </span>
+
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Mínimo 6 caracteres"
+                    autocomplete="new-password"
+                    minlength="6"
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    class="passwordToggle"
+                    id="passwordToggle"
+                    aria-label="Mostrar contraseña"
+                  >
+                    👁
+                  </button>
+
+                </div>
+
+                <small
+                  id="passwordError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="confirmPassword">
+                  Confirmar contraseña
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    🔒
+                  </span>
+
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    placeholder="Repite tu contraseña"
+                    autocomplete="new-password"
+                    minlength="6"
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    class="passwordToggle"
+                    id="confirmPasswordToggle"
+                    aria-label="Mostrar contraseña"
+                  >
+                    👁
+                  </button>
+
+                </div>
+
+                <small
+                  id="confirmPasswordError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+            </div>
+
+          </section>
+
+          <!-- VEHÍCULO -->
+          <section class="formSection">
+
+            <div class="sectionHeading">
+              <span>4</span>
+
+              <div>
+                <b>Datos del vehículo</b>
+                <small>Vehículo principal asociado a la cuenta.</small>
+              </div>
+            </div>
+
+            <div class="formGrid">
+
+              <div class="formGroup">
+
+                <label for="marca">
+                  Marca
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    🚗
+                  </span>
+
+                  <input
+                    type="text"
+                    id="marca"
+                    name="marca"
+                    placeholder="Ej. Chevrolet"
+                    autocomplete="off"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="marcaError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="subMarca">
+                  Submarca
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    🚙
+                  </span>
+
+                  <input
+                    type="text"
+                    id="subMarca"
+                    name="subMarca"
+                    placeholder="Ej. Tahoe"
+                    autocomplete="off"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="subMarcaError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="color">
+                  Color
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    🎨
+                  </span>
+
+                  <input
+                    type="text"
+                    id="color"
+                    name="color"
+                    placeholder="Ej. Negro"
+                    autocomplete="off"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="colorError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup">
+
+                <label for="placas">
+                  Placas
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    ▤
+                  </span>
+
+                  <input
+                    type="text"
+                    id="placas"
+                    name="placas"
+                    placeholder="Ej. ABC-123-A"
+                    autocomplete="off"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="placasError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+              <div class="formGroup fullWidth">
+
+                <label for="serie">
+                  Número de serie / VIN
+                </label>
+
+                <div class="inputWrapper">
+
+                  <span class="inputIcon">
+                    #
+                  </span>
+
+                  <input
+                    type="text"
+                    id="serie"
+                    name="serie"
+                    placeholder="Número de identificación vehicular"
+                    autocomplete="off"
+                    maxlength="17"
+                    required
+                  />
+
+                </div>
+
+                <small
+                  id="serieError"
+                  class="fieldError"
+                ></small>
+
+              </div>
+
+            </div>
+
+          </section>
+
+          <!-- TÉRMINOS -->
+          <label class="termsRow">
+
+            <input
+              type="checkbox"
+              id="acceptTerms"
+              required
+            />
+
+            <span class="customCheckbox"></span>
+
+            <span>
+              Acepto los
+              <button
+                type="button"
+                id="termsButton"
+              >
+                términos y condiciones
+              </button>
+              y el
+              <button
+                type="button"
+                id="privacyButton"
+              >
+                aviso de privacidad
+              </button>.
+            </span>
+
+          </label>
+
+          <small
+            id="termsError"
+            class="fieldError termsError"
+          ></small>
+
+          <!-- BOTÓN -->
+          <button
+            type="submit"
+            class="registerButton"
+            id="registerButton"
+          >
+
+            <span
+              id="registerButtonText"
+              class="registerButtonText"
+            >
+              CREAR MI CUENTA
+            </span>
+
+            <span
+              id="registerSpinner"
+              class="registerSpinner"
+              aria-hidden="true"
+            ></span>
+
+          </button>
+
+        </form>
+
+        <div class="loginAccess">
+
+          <p>
+            ¿Ya tienes una cuenta?
+          </p>
+
+          <a href="login.html">
+            INICIAR SESIÓN
+          </a>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL INFORMATIVO -->
+  <div
+    class="modalOverlay"
+    id="infoModal"
+    aria-hidden="true"
+  >
+
+    <div
+      class="modalCard"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="infoModalTitle"
+    >
+
+      <button
+        type="button"
+        class="modalClose"
+        id="closeInfoModal"
+        aria-label="Cerrar"
+      >
+        ✕
+      </button>
+
+      <div
+        class="modalIcon"
+        id="infoModalIcon"
+      >
+        ℹ
+      </div>
+
+      <h2 id="infoModalTitle">
+        Información
+      </h2>
+
+      <p id="infoModalText">
+        Información de AS CLICK.
+      </p>
+
+      <button
+        type="button"
+        class="modalPrimaryButton"
+        id="acceptInfoModal"
+      >
+        ENTENDIDO
+      </button>
+
+    </div>
+
+  </div>
+
+  <script
+    type="module"
+    src="registro.js?v=20260903-0304"
+  ></script>
+
+</body>
+</html>
