@@ -1274,11 +1274,252 @@ window.openService = folio => {
           : ""
       }
       <div class="cardActions">
-        <button>Reasignar proveedor</button>
-        <button>Ver ubicación</button>
+        <button onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Reasignar proveedor</button>
+        <button onclick="abrirUbicacionServicio('${escaparHtml(s.id)}')">Ver ubicación</button>
       </div>
     `
   );
+};
+
+
+function obtenerProveedorPorUid(uid){
+  const objetivo = String(uid || "").trim();
+  if (!objetivo) return null;
+
+  return state.providers.find(p =>
+    proveedorCoincideConUid(p,objetivo)
+  ) || null;
+}
+
+function proveedorDisponibleParaServicio(proveedor, servicio){
+  if (!proveedor || !servicio) return false;
+  if (proveedorEstaDeBaja(proveedor)) return false;
+
+  const estadoActual = estadoProveedorEnTiempoReal(proveedor);
+  if (estadoActual !== "Disponible") return false;
+
+  const tipoProveedor = normalizarTipoServicio(
+    proveedor.raw?.tipoProveedor ||
+    proveedor.raw?.tipo ||
+    proveedor.type ||
+    ""
+  );
+
+  return tipoProveedor === servicio.servicio;
+}
+
+window.abrirUbicacionServicio = id => {
+  const servicio = state.services.find(s => s.id === id);
+  if (!servicio) return;
+
+  const datos = servicio.raw || {};
+
+  const url =
+    datos.ubicacion?.enlaceGoogleMaps ||
+    datos.ubicacionDatos?.enlaceGoogleMaps ||
+    (
+      datos.ubicacion?.latitud != null &&
+      datos.ubicacion?.longitud != null
+        ? `https://maps.google.com/?q=${datos.ubicacion.latitud},${datos.ubicacion.longitud}`
+        : ""
+    ) ||
+    (
+      datos.ubicacionDatos?.latitud != null &&
+      datos.ubicacionDatos?.longitud != null
+        ? `https://maps.google.com/?q=${datos.ubicacionDatos.latitud},${datos.ubicacionDatos.longitud}`
+        : ""
+    ) ||
+    (typeof datos.ubicacion === "string" ? datos.ubicacion : "");
+
+  if (!url) {
+    openModal(
+      "Ubicación no disponible",
+      "<p>Este servicio no tiene una ubicación válida registrada.</p>"
+    );
+    return;
+  }
+
+  window.open(
+    String(url),
+    "_blank",
+    "noopener,noreferrer"
+  );
+};
+
+window.abrirReasignacionServicio = id => {
+  const servicio = state.services.find(s => s.id === id);
+  if (!servicio) return;
+
+  const proveedoresDisponibles = state.providers
+    .filter(p => proveedorDisponibleParaServicio(p,servicio))
+    .sort((a,b) => a.name.localeCompare(b.name,"es"));
+
+  const proveedorActual = servicio.uidProveedor
+    ? obtenerProveedorPorUid(servicio.uidProveedor)
+    : null;
+
+  const proveedorActualTexto = proveedorActual?.name || servicio.proveedor || "Sin asignar";
+
+  const opciones = proveedoresDisponibles.length
+    ? proveedoresDisponibles.map(p => `
+        <label style="display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #29435c;border-radius:10px;margin-bottom:8px;cursor:pointer;">
+          <input
+            type="radio"
+            name="proveedorReasignacion"
+            value="${escaparHtml(p.id)}"
+          >
+          <span>
+            <b>${escaparHtml(p.name)}</b><br>
+            <small>${escaparHtml(p.type)} · ${escaparHtml(p.telefono)}</small>
+          </span>
+        </label>
+      `).join("")
+    : `<p>No hay proveedores <b>${escaparHtml(servicio.servicio)}</b> disponibles en este momento.</p>`;
+
+  openModal(
+    `Reasignar ${servicio.folio}`,
+    `
+      <p><b>Servicio:</b> ${escaparHtml(servicio.servicio)}</p>
+      <p><b>Cliente:</b> ${escaparHtml(servicio.cliente)}</p>
+      <p><b>Proveedor actual:</b> ${escaparHtml(proveedorActualTexto)}</p>
+      <hr style="border:0;border-top:1px solid #29435c;margin:14px 0;">
+      ${opciones}
+      ${
+        proveedoresDisponibles.length
+          ? `
+            <div class="cardActions" style="margin-top:14px;">
+              <button
+                class="approve"
+                onclick="confirmarReasignacionServicio('${escaparHtml(servicio.id)}')"
+              >
+                Asignar proveedor
+              </button>
+            </div>
+          `
+          : ""
+      }
+    `
+  );
+};
+
+async function liberarProveedorAnterior(servicio,nuevoProveedorId){
+  const uidAnterior = String(servicio?.uidProveedor || "").trim();
+  if (!uidAnterior) return;
+
+  const proveedorAnterior = obtenerProveedorPorUid(uidAnterior);
+  if (!proveedorAnterior) return;
+
+  if (proveedorAnterior.id === nuevoProveedorId) return;
+
+  await firestoreUpdateDoc(
+    firestoreDoc(db,"proveedores",proveedorAnterior.id),
+    {
+      disponible: true,
+      estadoConexion: "disponible",
+      servicioActualId: null,
+      ultimaActualizacion: firestoreServerTimestamp()
+    }
+  );
+}
+
+window.confirmarReasignacionServicio = async id => {
+  const servicio = state.services.find(s => s.id === id);
+  if (!servicio || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  const seleccionado = document.querySelector(
+    'input[name="proveedorReasignacion"]:checked'
+  );
+
+  if (!seleccionado) {
+    window.alert("Selecciona un proveedor.");
+    return;
+  }
+
+  const proveedor = state.providers.find(
+    p => p.id === seleccionado.value
+  );
+
+  if (!proveedor) {
+    window.alert("El proveedor seleccionado ya no está disponible.");
+    return;
+  }
+
+  if (!proveedorDisponibleParaServicio(proveedor,servicio)) {
+    window.alert("Ese proveedor ya no está disponible. Actualiza y selecciona otro.");
+    return;
+  }
+
+  const confirmar = window.confirm(
+    `¿Asignar el servicio ${servicio.folio} a ${proveedor.name}?`
+  );
+
+  if (!confirmar) return;
+
+  try {
+    const solicitudRef = firestoreDoc(
+      db,
+      "solicitudes",
+      servicio.id
+    );
+
+    await liberarProveedorAnterior(
+      servicio,
+      proveedor.id
+    );
+
+    await firestoreUpdateDoc(
+      solicitudRef,
+      {
+        estado: "asignado",
+        "asignacion.uidProveedor": proveedor.uid || proveedor.id,
+        "asignacion.nombreProveedor": proveedor.name,
+        "asignacion.telefonoProveedor":
+          proveedor.raw?.telefono ||
+          proveedor.raw?.celular ||
+          "",
+        "asignacion.fotoProveedor":
+          proveedor.raw?.foto ||
+          proveedor.raw?.fotoURL ||
+          "",
+        "asignacion.tipoProveedor":
+          proveedor.raw?.tipoProveedor ||
+          proveedor.raw?.tipo ||
+          String(proveedor.type || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g,"")
+            .replace(/\s+/g,"_"),
+        fechaAsignacion: firestoreServerTimestamp(),
+        actualizadoEn: firestoreServerTimestamp()
+      }
+    );
+
+    await firestoreUpdateDoc(
+      firestoreDoc(
+        db,
+        "proveedores",
+        proveedor.id
+      ),
+      {
+        disponible: false,
+        estadoConexion: "ocupado",
+        servicioActualId: servicio.id,
+        ultimaActualizacion: firestoreServerTimestamp()
+      }
+    );
+
+    closeModal();
+  } catch (error) {
+    console.error("Error reasignando proveedor:",error);
+
+    openModal(
+      "No fue posible reasignar",
+      `
+        <p>Firebase rechazó la actualización.</p>
+        <p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>
+      `
+    );
+  }
 };
 
 window.openProvider = id => {
