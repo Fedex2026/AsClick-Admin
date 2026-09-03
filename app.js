@@ -192,6 +192,57 @@ function obtenerNombreProveedor(datos = {}){
   );
 }
 
+
+function calcularCostoServicioFallback(datos = {}, tipoVisible = ""){
+  const tipo = String(
+    datos.servicio?.nombre ||
+    datos.servicio?.tipo ||
+    datos.tipoServicio ||
+    tipoVisible ||
+    ""
+  )
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/_/g," ");
+
+  if (tipo === "grua") {
+    return 0;
+  }
+
+  const cliente = datos.cliente || {};
+  const tieneMembresia =
+    cliente.tieneMembresia === true &&
+    String(cliente.estadoMembresia || "").toLowerCase() === "activa";
+
+  if (!tieneMembresia) {
+    const sinMembresia = {
+      ajustador: 1800,
+      abogado: 2400,
+      "auxilio vial": 380
+    };
+    return sinMembresia[tipo] || 0;
+  }
+
+  if (String(cliente.tipoCliente || "").toLowerCase() === "servicio_publico") {
+    const servicioPublico = {
+      ajustador: 500,
+      abogado: 850,
+      "auxilio vial": 120
+    };
+    return servicioPublico[tipo] || 0;
+  }
+
+  const particular = {
+    ajustador: 750,
+    abogado: 900,
+    "auxilio vial": 190
+  };
+
+  return particular[tipo] || 0;
+}
+
 function convertirSolicitud(doc){
   const datos = doc.data();
 
@@ -226,7 +277,7 @@ function convertirSolicitud(doc){
     datos.servicio ||
     "";
 
-  const monto =
+  const montoGuardado =
     convertirImporteANumero(
       datos.total ??
       datos.importeTotal ??
@@ -236,6 +287,14 @@ function convertirSolicitud(doc){
       datos.costoServicio ??
       0
     );
+
+  const monto =
+    montoGuardado > 0
+      ? montoGuardado
+      : calcularCostoServicioFallback(
+          datos,
+          normalizarTipoServicio(tipo)
+        );
 
   return {
     id: doc.id,
@@ -261,12 +320,26 @@ function convertirSolicitud(doc){
 }
 
 function obtenerEstadoProveedor(datos = {}){
-  if (datos.ocupado === true) return "Ocupado";
+  const estadoConexion = String(
+    datos.estadoConexion ||
+    datos.estado ||
+    datos.status ||
+    ""
+  ).trim().toLowerCase();
+
+  if (
+    datos.ocupado === true ||
+    estadoConexion === "ocupado" ||
+    Boolean(datos.servicioActualId)
+  ) {
+    return "Ocupado";
+  }
 
   if (
     datos.disponible === true ||
-    datos.estado === "disponible" ||
-    datos.status === "disponible"
+    estadoConexion === "disponible" ||
+    estadoConexion === "conectado" ||
+    estadoConexion === "en_linea"
   ) {
     return "Disponible";
   }
@@ -274,7 +347,8 @@ function obtenerEstadoProveedor(datos = {}){
   if (
     datos.activo === false ||
     datos.suspendido === true ||
-    datos.estado === "suspendido"
+    estadoConexion === "suspendido" ||
+    estadoConexion === "desconectado"
   ) {
     return "Desconectado";
   }
@@ -287,6 +361,13 @@ function convertirProveedor(doc){
 
   return {
     id: doc.id,
+    uid: texto(
+      datos.uid ||
+      datos.usuarioId ||
+      datos.uidProveedor ||
+      doc.id,
+      doc.id
+    ),
     raw: datos,
     name: texto(
       datos.nombre ||
@@ -447,20 +528,47 @@ function obtenerUidsProveedoresOcupados(){
   return new Set(
     state.services
       .filter(servicioMantieneProveedorOcupado)
-      .map(s => s.uidProveedor)
+      .map(s => String(s.uidProveedor || "").trim())
       .filter(Boolean)
   );
 }
 
-function estadoProveedorEnTiempoReal(proveedor){
-  const ocupados = obtenerUidsProveedoresOcupados();
+function proveedorCoincideConUid(proveedor, uid){
+  const objetivo = String(uid || "").trim();
+  if (!objetivo) return false;
 
-  if (ocupados.has(proveedor.id)) {
-    return "Ocupado";
+  const candidatos = [
+    proveedor?.id,
+    proveedor?.uid,
+    proveedor?.raw?.uid,
+    proveedor?.raw?.usuarioId,
+    proveedor?.raw?.uidProveedor
+  ]
+    .map(v => String(v || "").trim())
+    .filter(Boolean);
+
+  return candidatos.includes(objetivo);
+}
+
+function proveedorTieneServicioActivo(proveedor){
+  const uidsOcupados = obtenerUidsProveedoresOcupados();
+
+  if (
+    proveedor?.status === "Ocupado" ||
+    proveedor?.raw?.estadoConexion === "ocupado" ||
+    Boolean(proveedor?.raw?.servicioActualId)
+  ) {
+    return true;
   }
 
-  if (proveedor.status === "Ocupado") {
-    return "Disponible";
+  return [...uidsOcupados].some(uid =>
+    proveedorCoincideConUid(proveedor,uid)
+  );
+}
+
+function estadoProveedorEnTiempoReal(proveedor){
+  if (proveedorTieneServicioActivo(proveedor)) {
+    return "Ocupado";
   }
 
   return proveedor.status;
@@ -491,16 +599,26 @@ function recalcularKpis(){
     ).length
   );
 
-  const uidsOcupados = obtenerUidsProveedoresOcupados();
-  const ocupados = state.providers.filter(p => uidsOcupados.has(p.id)).length;
+  const proveedoresOcupados = state.providers.filter(
+    proveedorTieneServicioActivo
+  );
+
+  const uidsServiciosActivos = obtenerUidsProveedoresOcupados();
+
+  const ocupadosSinFicha = [...uidsServiciosActivos].filter(uid =>
+    !state.providers.some(p => proveedorCoincideConUid(p,uid))
+  ).length;
+
+  const ocupados =
+    proveedoresOcupados.length +
+    ocupadosSinFicha;
+
   const disponibles = state.providers.filter(
     p =>
-      !uidsOcupados.has(p.id) &&
-      (
-        p.status === "Disponible" ||
-        p.status === "Ocupado"
-      )
+      !proveedorTieneServicioActivo(p) &&
+      p.status === "Disponible"
   ).length;
+
   const conectados = disponibles + ocupados;
   const membresias = state.clients.filter(c => c.hasMembership).length;
 
@@ -527,7 +645,7 @@ function recalcularKpis(){
   kpiBottomData[2].sub = "en total";
   kpiBottomData[3].sub = "membresías detectadas";
   kpiBottomData[4].sub = "se conectará después";
-  kpiBottomData[5].sub = ingresosHoy > 0 ? "servicios finalizados hoy" : "sin ingresos finalizados hoy";
+  kpiBottomData[5].sub = ingresosHoy > 0 ? "servicios finalizados hoy" : "sin importes registrados";
 
   const badge = document.getElementById("authBadge");
   if (badge) badge.textContent = String(state.authorizations.length);
