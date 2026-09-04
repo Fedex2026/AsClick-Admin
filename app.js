@@ -5167,6 +5167,14 @@ async function iniciarFirebaseAdmin(){
 
  
 
+    const authModule = await import(
+
+      "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js"
+
+    );
+
+ 
+
     const firestoreModule = await import(
 
       "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js"
@@ -5174,6 +5182,8 @@ async function iniciarFirebaseAdmin(){
     );
 
  
+
+    const auth = firebaseConfigModule.auth;
 
     db = firebaseConfigModule.db;
 
@@ -5203,27 +5213,113 @@ async function iniciarFirebaseAdmin(){
 
  
 
-    if (!db) {
+    if (!db || !auth) {
 
-      throw new Error("firebase-config.js no exporta db.");
+      throw new Error("firebase-config.js debe exportar db y auth.");
 
     }
 
  
 
-    firebaseReady = true;
+    authModule.onAuthStateChanged(auth, async user => {
+
+      if (!user) {
+
+        firebaseReady = false;
+
+        window.location.replace("./login.html");
+
+        return;
+
+      }
 
  
 
-    escucharClientes();
+      try {
 
-    escucharProveedores();
+        // Leer el propio documento siempre está permitido por las reglas.
 
-    escucharServicios();
+        const adminSnap = await firestoreGetDoc(
 
-    escucharMembresias();
+          firestoreDoc(db,"usuarios",user.uid)
+
+        );
+
+ 
+
+        const adminData = adminSnap.exists() ? adminSnap.data() : null;
+
+        const esAdministrador =
+
+          adminData &&
+
+          String(adminData.rol || "").toLowerCase() === "admin" &&
+
+          adminData.activo === true;
+
+ 
+
+        if (!esAdministrador) {
+
+          firebaseReady = false;
+
+          console.error(
+
+            "La sesión actual no corresponde a un administrador autorizado.",
+
+            { uid:user.uid, email:user.email, rol:adminData?.rol, activo:adminData?.activo }
+
+          );
+
+          await authModule.signOut(auth);
+
+          window.alert(
+
+            "La sesión abierta pertenece a Cliente/Proveedor o no tiene permisos de administrador. Inicia sesión con tu cuenta Admin."
+
+          );
+
+          window.location.replace("./login.html");
+
+          return;
+
+        }
+
+ 
+
+        // IMPORTANTE: los listeners arrancan solamente después de validar Admin.
+
+        firebaseReady = true;
+
+        escucharClientes();
+
+        escucharProveedores();
+
+        escucharServicios();
+
+        escucharMembresias();
+
+      } catch (error) {
+
+        firebaseReady = false;
+
+        console.error("Error validando administrador:",error);
+
+        openModal(
+
+          "No fue posible validar Admin",
+
+          `<p>No se pudo validar la cuenta administrativa.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+
+        );
+
+      }
+
+    });
 
   } catch (error) {
+
+    firebaseReady = false;
 
     console.error("No fue posible iniciar Firebase en Admin:",error);
 
