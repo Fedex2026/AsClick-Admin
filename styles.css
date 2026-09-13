@@ -32,8 +32,6 @@
 
 }
 
- 
-
 *{box-sizing:border-box}
 
 html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:radial-gradient(circle at 60% 0%,#10253c 0,#07111d 38%,#050c15 100%);color:var(--text)}
@@ -43,8 +41,6 @@ button,input,select{font:inherit}
 button{cursor:pointer}
 
 body{overflow-x:hidden}
-
- 
 
 .appShell{display:grid;grid-template-columns:244px minmax(0,1fr);min-height:100vh}
 
@@ -68,8 +64,6 @@ body{overflow-x:hidden}
 
 .cabinaTitle{font-weight:700;margin-bottom:14px}.cabinaPhone{color:#d5e3f1;margin-bottom:12px}.cabinaStatus{color:#d9e6f3}.cabinaStatus span{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(35,193,107,.15);margin-right:10px}
 
- 
-
 .mainArea{grid-column:2;min-width:0;padding:0 20px 28px}
 
 .topbar{height:68px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #193047;position:sticky;top:0;background:rgba(6,16,27,.94);backdrop-filter:blur(12px);z-index:20;margin:0 -20px;padding:0 20px}
@@ -84,8 +78,6 @@ body{overflow-x:hidden}
 
 .adminUser{gap:9px}.avatar{width:36px;height:36px;border:1px solid #516579;border-radius:50%;display:grid;place-items:center}.adminUser b,.adminUser span{display:block}.adminUser b{font-size:13px}.adminUser span{font-size:10px;color:#b9c7d5;margin-top:3px}
 
- 
-
 .pageSection{display:none}.pageSection.active{display:block}.toolbar{display:flex;justify-content:space-between;padding:12px 0 10px}.toolbarActions{display:flex;gap:10px}.dateBtn,.refreshBtn,.primaryBtn{border-radius:8px;border:1px solid #2a4055;color:#eaf4ff;padding:9px 14px;background:#0e1a28}.refreshBtn,.primaryBtn{background:#0d4d8f;border-color:#155d9f}
 
 .kpiGrid{display:grid;gap:12px}.kpiGridTop{grid-template-columns:repeat(6,minmax(0,1fr))}.kpiGridBottom{grid-template-columns:repeat(6,minmax(0,1fr));margin-top:12px}
@@ -97,8 +89,6 @@ body{overflow-x:hidden}
 .kpi .spark{position:absolute;right:12px;bottom:11px;width:80px;height:28px}
 
 .kpi.pending .label,.kpi.pending .icon{color:#56a7ff}.kpi.assigned .label,.kpi.assigned .icon{color:var(--orange)}.kpi.onway .label,.kpi.onway .icon{color:#58d686}.kpi.onsite .label,.kpi.onsite .icon{color:#b277ff}.kpi.done .label,.kpi.done .icon{color:#54d5ff}.kpi.cancelled .label,.kpi.cancelled .icon{color:#ff6666}
-
- 
 
 .mainGrid{display:grid;grid-template-columns:1.05fr 1.85fr;gap:14px;margin-top:14px}
 
@@ -116,17 +106,11 @@ body{overflow-x:hidden}
 
 .status-pendiente{color:#ffb71b;background:#47320a;border-color:#9f6d00}.status-asignado{color:#ffb450;background:#4d2b0d;border-color:#9c5f14}.status-en-camino,.status-disponible{color:#67e394;background:#103b28;border-color:#247d4c}.status-en-sitio{color:#c995ff;background:#34204d;border-color:#7047a1}.status-finalizado{color:#5ec9ff;background:#10334a;border-color:#2477a4}.status-cancelado,.status-ocupado{color:#ff7a6d;background:#421d1b;border-color:#a54942}
 
- 
-
 #liveMap{height:275px;background:#cbd8e1}.mapLegend{display:flex;gap:16px;flex-wrap:wrap;padding:9px 12px;font-size:10px}.legendDot,.legendRing{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}.client{background:#167de0}.adjuster{background:#963eea}.lawyer{background:#1aa6a3}.roadside{background:#b79116}.tow{background:#f46a1f}.legendRing{border:2px solid #ff493e}
-
- 
 
 .authRow,.providerRow{display:grid;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #21364a}.authRow{grid-template-columns:38px 1fr auto auto}.providerRow{grid-template-columns:38px 1fr auto auto auto}.miniAvatar{width:34px;height:34px;border-radius:50%;background:#1e6078;display:grid;place-items:center;font-weight:700}.rowMain b{display:block;font-size:12px}.rowMain span{display:block;font-size:10px;color:#a8b9ca;margin-top:3px}.pill{font-size:10px;padding:4px 8px;border:1px solid #8a6500;background:#4a360a;color:#ffc02b;border-radius:5px}.rating{font-size:11px;color:#ffcb45}
 
 .chartPanel canvas{width:100%;height:210px;padding:10px}
-
- 
 
 .contentHeader{display:flex;align-items:center;justify-content:space-between;padding:18px 0 12px}.contentHeader h2{margin:0;font-size:22px}.contentHeader p{color:#99aabd;margin:4px 0 0;font-size:12px}
 
@@ -143,8 +127,6 @@ body{overflow-x:hidden}
 .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:grid;place-items:center;z-index:80}.modalOverlay[hidden]{display:none}.modal{width:min(560px,92vw);max-height:80vh;overflow:auto;background:#0f1c2b;border:1px solid #35516d;border-radius:12px;padding:20px;position:relative}.modalClose{position:absolute;right:12px;top:10px;border:0;background:transparent;color:#fff;font-size:24px}.modal h3{margin-top:0}
 
 .mobileOverlay{display:none}
-
- 
 
 @media(max-width:1280px){
 
@@ -182,11 +164,7 @@ body{overflow-x:hidden}
 
 }
 
- 
-
 .status-pendiente-cotizacion,.status-esperando-autorizacion-cliente{color:#d6b4ff;background:#382050;border-color:#7650a0}.quoteCount{display:inline-block;min-width:26px;text-align:center;padding:4px 8px;border-radius:999px;background:#1c4664;color:#8ed7ff;border:1px solid #2e6d94;font-weight:800}.quoteDetail{display:grid;gap:9px;padding:10px 0}.quoteDetail article{border:1px solid #29435c;border-radius:9px;padding:11px;background:#0b1825}.quoteDetail article b{color:#fff}.quoteDetail small{display:block;color:#9fb0c4;margin-top:4px}.tableAction{border:1px solid #34516c;background:#13283b;color:#fff;border-radius:7px;padding:6px 9px}
-
- 
 
 /* =========================================
 
@@ -267,6 +245,32 @@ body{overflow-x:hidden}
   .reportBreakdownRow{grid-template-columns:85px 1fr 55px}
 
 }
+
+/* =========================================
+
+   PAGOS
+
+========================================= */
+
+.paymentHeader{gap:14px;flex-wrap:wrap}
+
+.paymentKpiGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+
+.paymentKpiCard{min-height:112px;border:1px solid #263d54;border-radius:10px;background:linear-gradient(145deg,#132337,#0d1927);padding:14px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+
+.paymentKpiLabel{font-size:11px;color:#aebfd0}.paymentKpiValue{font-size:24px;font-weight:900;margin:8px 0 4px}.paymentKpiSub{font-size:10px;color:#7f94a8}.paymentKpiIcon{position:absolute;right:12px;top:12px;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(42,140,255,.12);color:#62b2ff}
+
+.paymentRules{display:flex;gap:9px;flex-wrap:wrap;padding:12px;margin-bottom:14px}.paymentRules span{font-size:10px;color:#b7c7d7;background:#0b1825;border:1px solid #29435c;border-radius:8px;padding:8px 10px}
+
+.paymentPanel{overflow:visible}.paymentFilters{align-items:end;flex-wrap:wrap}.paymentFilters label{display:grid;gap:5px;color:#9fb0c4;font-size:11px;min-width:150px}.paymentFilters input,.paymentFilters select{width:100%}
+
+.paymentStatus{display:inline-block;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:800;border:1px solid}.paymentPaid{color:#67e394;background:#103b28;border-color:#247d4c}.paymentPending{color:#ffbf4d;background:#47320a;border-color:#9f6d00}.paymentMuted{color:#8295a9;font-size:10px}.paymentPay{background:#12623c;border-color:#1b7b4c}.paymentUndo{background:#4a3512;border-color:#76551c}
+
+.paymentModalLabel{display:block;color:#9fb0c4;font-size:11px;margin:14px 0 6px}.paymentModalInput{width:100%;background:#0c1825;border:1px solid #2a4055;color:#eef5fb;border-radius:7px;padding:11px}.paymentPreview{margin-top:10px;padding:10px;border:1px solid #29435c;border-radius:8px;background:#0b1825;color:#dce8f4;font-weight:800}
+
+@media(max-width:980px){.paymentKpiGrid{grid-template-columns:repeat(2,1fr)}}
+
+@media(max-width:680px){.paymentKpiGrid{grid-template-columns:1fr}.paymentHeader .dateBtn{width:100%}}
 
 @media print{
 
