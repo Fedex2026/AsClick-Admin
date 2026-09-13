@@ -416,9 +416,9 @@ function calcularCostoServicioFallback(datos = {}, tipoVisible = ""){
 
       ajustador: 500,
 
-      abogado: 850,
+      abogado: 900,
 
-      "auxilio vial": 120
+      "auxilio vial": 190
 
     };
 
@@ -428,7 +428,7 @@ function calcularCostoServicioFallback(datos = {}, tipoVisible = ""){
 
   const particular = {
 
-    ajustador: 750,
+    ajustador: 500,
 
     abogado: 900,
 
