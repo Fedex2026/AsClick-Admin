@@ -2982,6 +2982,650 @@ function drawIncomeChart(){
 
 ========================================= */
 
+// =========================================
+
+// PAGOS Y LIQUIDACIONES
+
+// =========================================
+
+function pagoFechaServicio(servicio){
+
+  return obtenerMilisegundos(
+
+    servicio?.fechaFinalizacion ||
+
+    servicio?.raw?.fechaFinalizacion ||
+
+    servicio?.raw?.finalizadoEn ||
+
+    servicio?.raw?.fechaTermino ||
+
+    servicio?.raw?.fechaFinalizado ||
+
+    servicio?.fecha ||
+
+    servicio?.fechaCreacion
+
+  );
+
+}
+
+function pagoFechaLocalInput(fecha){
+
+  const d = fecha instanceof Date ? fecha : new Date(fecha);
+
+  if (Number.isNaN(d.getTime())) return "";
+
+  const y = d.getFullYear();
+
+  const m = String(d.getMonth()+1).padStart(2,"0");
+
+  const dia = String(d.getDate()).padStart(2,"0");
+
+  return `${y}-${m}-${dia}`;
+
+}
+
+function pagoCostoProveedorFijo(tipo){
+
+  const normal = normalizarTipoServicio(tipo);
+
+  if (normal === "Ajustador") return 300;
+
+  if (normal === "Abogado") return 700;
+
+  if (normal === "Auxilio Vial") return 110;
+
+  return 0;
+
+}
+
+function pagoDatosGuardados(servicio){
+
+  const raw = servicio?.raw || {};
+
+  const pago = raw.pago || {};
+
+  const pagoProveedor = raw.pagoProveedor || {};
+
+  const costoProveedor = convertirImporteANumero(
+
+    raw.costoProveedor ??
+
+    raw.costoProveedorServicio ??
+
+    pagoProveedor.monto ??
+
+    pago.costoProveedor ??
+
+    0
+
+  );
+
+  const comision = convertirImporteANumero(
+
+    raw.comisionAsClick ??
+
+    raw.comisionASClick ??
+
+    pago.comisionAsClick ??
+
+    0
+
+  );
+
+  const totalCliente = convertirImporteANumero(
+
+    raw.total ??
+
+    raw.importeTotal ??
+
+    raw.precioCliente ??
+
+    raw.costoCliente ??
+
+    pago.totalCliente ??
+
+    servicio?.monto ??
+
+    0
+
+  );
+
+  const estadoProveedor = String(
+
+    pagoProveedor.estado ||
+
+    pago.estadoProveedor ||
+
+    raw.estadoPagoProveedor ||
+
+    "pendiente"
+
+  ).trim().toLowerCase();
+
+  const fechaPago =
+
+    pagoProveedor.fechaPago ||
+
+    pago.fechaPagoProveedor ||
+
+    raw.fechaPagoProveedor ||
+
+    null;
+
+  return { costoProveedor, comision, totalCliente, estadoProveedor, fechaPago };
+
+}
+
+function calcularPagoServicio(servicio){
+
+  const tipo = normalizarTipoServicio(servicio?.servicio || servicio?.raw?.tipoServicio || "");
+
+  const guardado = pagoDatosGuardados(servicio);
+
+  let costoProveedor = guardado.costoProveedor;
+
+  let comisionAsClick = guardado.comision;
+
+  let totalCliente = guardado.totalCliente;
+
+  let requiereCostoGrua = false;
+
+  if (tipo === "Grúa") {
+
+    if (costoProveedor > 0) {
+
+      comisionAsClick = Number((costoProveedor * 0.10).toFixed(2));
+
+      totalCliente = Number((costoProveedor + comisionAsClick).toFixed(2));
+
+    } else {
+
+      requiereCostoGrua = true;
+
+      comisionAsClick = 0;
+
+    }
+
+  } else {
+
+    const costoFijo = pagoCostoProveedorFijo(tipo);
+
+    if (costoFijo > 0) costoProveedor = costoFijo;
+
+    comisionAsClick = Math.max(0,Number((totalCliente - costoProveedor).toFixed(2)));
+
+  }
+
+  return {
+
+    tipo,
+
+    costoProveedor,
+
+    comisionAsClick,
+
+    totalCliente,
+
+    requiereCostoGrua,
+
+    estadoProveedor: guardado.estadoProveedor === "pagado" ? "pagado" : "pendiente",
+
+    fechaPago: guardado.fechaPago
+
+  };
+
+}
+
+function obtenerServiciosPago(){
+
+  const desde = document.getElementById("paymentDateFrom")?.value || "";
+
+  const hasta = document.getElementById("paymentDateTo")?.value || "";
+
+  const tipo = document.getElementById("paymentTypeFilter")?.value || "";
+
+  const estadoPago = document.getElementById("paymentStatusFilter")?.value || "";
+
+  const desdeMs = desde ? new Date(`${desde}T00:00:00`).getTime() : 0;
+
+  const hastaMs = hasta ? new Date(`${hasta}T23:59:59.999`).getTime() : Number.MAX_SAFE_INTEGER;
+
+  return state.services
+
+    .filter(s => s.estado === "Finalizado")
+
+    .filter(s => {
+
+      const ms = pagoFechaServicio(s);
+
+      return (!ms || (ms >= desdeMs && ms <= hastaMs));
+
+    })
+
+    .filter(s => !tipo || normalizarTipoServicio(s.servicio) === tipo)
+
+    .filter(s => {
+
+      if (!estadoPago) return true;
+
+      return calcularPagoServicio(s).estadoProveedor === estadoPago;
+
+    })
+
+    .sort((a,b) => pagoFechaServicio(b) - pagoFechaServicio(a));
+
+}
+
+function renderPaymentKpis(servicios){
+
+  const box = document.getElementById("paymentKpis");
+
+  if (!box) return;
+
+  let cobrado = 0;
+
+  let proveedores = 0;
+
+  let utilidad = 0;
+
+  let pendiente = 0;
+
+  servicios.forEach(s => {
+
+    const p = calcularPagoServicio(s);
+
+    if (p.requiereCostoGrua) return;
+
+    cobrado += p.totalCliente;
+
+    proveedores += p.costoProveedor;
+
+    utilidad += p.comisionAsClick;
+
+    if (p.estadoProveedor !== "pagado") pendiente += p.costoProveedor;
+
+  });
+
+  const datos = [
+
+    ["Cobrado a clientes",formatearDinero(cobrado),"Servicios finalizados","$"],
+
+    ["Pago a proveedores",formatearDinero(proveedores),"Costo total de proveedor","▱"],
+
+    ["Utilidad AS CLICK",formatearDinero(utilidad),"Comisión / margen","↗"],
+
+    ["Pendiente por liquidar",formatearDinero(pendiente),"A proveedores","◷"]
+
+  ];
+
+  box.innerHTML = datos.map(([label,value,sub,icon]) => `
+
+    <article class="paymentKpiCard">
+
+      <div class="paymentKpiLabel">${escaparHtml(label)}</div>
+
+      <div class="paymentKpiValue">${escaparHtml(value)}</div>
+
+      <div class="paymentKpiSub">${escaparHtml(sub)}</div>
+
+      <div class="paymentKpiIcon">${icon}</div>
+
+    </article>
+
+  `).join("");
+
+}
+
+function renderPayments(){
+
+  const body = document.getElementById("paymentsBody");
+
+  if (!body) return;
+
+  const servicios = obtenerServiciosPago();
+
+  renderPaymentKpis(servicios);
+
+  if (!servicios.length) {
+
+    body.innerHTML = `<tr><td colspan="10">No hay servicios finalizados en el periodo seleccionado.</td></tr>`;
+
+    return;
+
+  }
+
+  body.innerHTML = servicios.map(s => {
+
+    const p = calcularPagoServicio(s);
+
+    const fechaMs = pagoFechaServicio(s);
+
+    const fecha = fechaMs ? new Date(fechaMs).toLocaleDateString("es-MX") : "—";
+
+    const estado = p.estadoProveedor === "pagado" ? "Pagado" : "Pendiente";
+
+    const estadoClase = p.estadoProveedor === "pagado" ? "paymentPaid" : "paymentPending";
+
+    const importeCliente = p.requiereCostoGrua
+
+      ? `<span class="paymentMuted">Pendiente de costo</span>`
+
+      : escaparHtml(formatearDinero(p.totalCliente));
+
+    const pagoProveedor = p.requiereCostoGrua
+
+      ? `<span class="paymentMuted">Capturar costo</span>`
+
+      : escaparHtml(formatearDinero(p.costoProveedor));
+
+    const utilidad = p.requiereCostoGrua
+
+      ? `<span class="paymentMuted">10% al capturar</span>`
+
+      : escaparHtml(formatearDinero(p.comisionAsClick));
+
+    let accion = "";
+
+    if (p.requiereCostoGrua) {
+
+      accion = `<button class="tableAction" onclick="capturarCostoGruaPago('${escaparHtml(s.id)}')">Capturar costo</button>`;
+
+    } else if (p.estadoProveedor === "pagado") {
+
+      accion = `<button class="tableAction paymentUndo" onclick="cambiarEstadoPagoProveedor('${escaparHtml(s.id)}','pendiente')">Marcar pendiente</button>`;
+
+    } else {
+
+      accion = `<button class="tableAction paymentPay" onclick="cambiarEstadoPagoProveedor('${escaparHtml(s.id)}','pagado')">Marcar pagado</button>`;
+
+    }
+
+    return `
+
+      <tr>
+
+        <td><b>${escaparHtml(s.folio)}</b></td>
+
+        <td>${escaparHtml(fecha)}</td>
+
+        <td>${escaparHtml(s.cliente)}</td>
+
+        <td>${escaparHtml(p.tipo)}</td>
+
+        <td>${escaparHtml(s.proveedor || "Sin asignar")}</td>
+
+        <td>${importeCliente}</td>
+
+        <td>${pagoProveedor}</td>
+
+        <td>${utilidad}</td>
+
+        <td><span class="paymentStatus ${estadoClase}">${estado}</span></td>
+
+        <td>${accion}</td>
+
+      </tr>
+
+    `;
+
+  }).join("");
+
+}
+
+window.capturarCostoGruaPago = id => {
+
+  const servicio = state.services.find(s => s.id === id);
+
+  if (!servicio) return;
+
+  openModal(
+
+    `Costo de grúa ${servicio.folio}`,
+
+    `
+
+      <p>Captura el <b>costo que cobra el proveedor de grúa</b>. AS CLICK agregará automáticamente el <b>10%</b>.</p>
+
+      <label class="paymentModalLabel">Costo proveedor</label>
+
+      <input id="towPaymentProviderCost" class="paymentModalInput" type="number" min="0" step="0.01" placeholder="Ej. 2000">
+
+      <div id="towPaymentPreview" class="paymentPreview">AS CLICK: $0.00 · Total cliente: $0.00</div>
+
+      <div class="cardActions"><button class="approve" onclick="guardarCostoGruaPago('${escaparHtml(id)}')">Guardar costo</button></div>
+
+    `
+
+  );
+
+  const input = document.getElementById("towPaymentProviderCost");
+
+  const preview = document.getElementById("towPaymentPreview");
+
+  input?.addEventListener("input",() => {
+
+    const costo = convertirImporteANumero(input.value);
+
+    const comision = Number((costo*0.10).toFixed(2));
+
+    const total = Number((costo+comision).toFixed(2));
+
+    if (preview) preview.textContent = `AS CLICK: ${formatearDinero(comision)} · Total cliente: ${formatearDinero(total)}`;
+
+  });
+
+};
+
+window.guardarCostoGruaPago = async id => {
+
+  if (!firebaseReady || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  const servicio = state.services.find(s => s.id === id);
+
+  const input = document.getElementById("towPaymentProviderCost");
+
+  const costo = convertirImporteANumero(input?.value);
+
+  if (!servicio || costo <= 0) {
+
+    window.alert("Captura un costo válido de grúa.");
+
+    return;
+
+  }
+
+  const comision = Number((costo*0.10).toFixed(2));
+
+  const total = Number((costo+comision).toFixed(2));
+
+  try {
+
+    await firestoreUpdateDoc(firestoreDoc(db,"solicitudes",id),{
+
+      costoProveedor: costo,
+
+      comisionAsClick: comision,
+
+      precioCliente: total,
+
+      total,
+
+      "pagoProveedor.monto": costo,
+
+      "pagoProveedor.estado": "pendiente",
+
+      "pagoProveedor.actualizadoEn": firestoreServerTimestamp(),
+
+      "pago.costoProveedor": costo,
+
+      "pago.comisionAsClick": comision,
+
+      "pago.totalCliente": total,
+
+      "pago.estadoProveedor": "pendiente",
+
+      "pago.actualizadoEn": firestoreServerTimestamp()
+
+    });
+
+    closeModal();
+
+  } catch (error) {
+
+    console.error("Error guardando costo de grúa:",error);
+
+    window.alert("No fue posible guardar el costo de la grúa.");
+
+  }
+
+};
+
+window.cambiarEstadoPagoProveedor = async (id,estado) => {
+
+  if (!firebaseReady || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  const servicio = state.services.find(s => s.id === id);
+
+  if (!servicio) return;
+
+  const p = calcularPagoServicio(servicio);
+
+  if (p.requiereCostoGrua) {
+
+    window.alert("Primero captura el costo de la grúa.");
+
+    return;
+
+  }
+
+  const nuevoEstado = estado === "pagado" ? "pagado" : "pendiente";
+
+  if (nuevoEstado === "pagado" && !window.confirm(`¿Marcar como pagado ${formatearDinero(p.costoProveedor)} a ${servicio.proveedor || "este proveedor"}?`)) return;
+
+  try {
+
+    await firestoreUpdateDoc(firestoreDoc(db,"solicitudes",id),{
+
+      "pagoProveedor.monto": p.costoProveedor,
+
+      "pagoProveedor.estado": nuevoEstado,
+
+      "pagoProveedor.fechaPago": nuevoEstado === "pagado" ? firestoreServerTimestamp() : null,
+
+      "pagoProveedor.actualizadoEn": firestoreServerTimestamp(),
+
+      "pago.estadoProveedor": nuevoEstado,
+
+      "pago.fechaPagoProveedor": nuevoEstado === "pagado" ? firestoreServerTimestamp() : null,
+
+      "pago.actualizadoEn": firestoreServerTimestamp(),
+
+      costoProveedor: p.costoProveedor,
+
+      comisionAsClick: p.comisionAsClick
+
+    });
+
+  } catch (error) {
+
+    console.error("Error actualizando pago de proveedor:",error);
+
+    window.alert("No fue posible actualizar el estado del pago.");
+
+  }
+
+};
+
+function exportarPagosCsv(){
+
+  const servicios = obtenerServiciosPago();
+
+  const encabezados = ["Folio","Fecha","Cliente","Servicio","Proveedor","Cobrado cliente","Pago proveedor","AS CLICK","Estado proveedor"];
+
+  const filas = servicios.map(s => {
+
+    const p = calcularPagoServicio(s);
+
+    return [
+
+      s.folio,
+
+      pagoFechaServicio(s) ? new Date(pagoFechaServicio(s)).toLocaleString("es-MX") : "",
+
+      s.cliente,
+
+      p.tipo,
+
+      s.proveedor,
+
+      p.requiereCostoGrua ? "" : p.totalCliente,
+
+      p.requiereCostoGrua ? "" : p.costoProveedor,
+
+      p.requiereCostoGrua ? "" : p.comisionAsClick,
+
+      p.requiereCostoGrua ? "Costo de grúa pendiente" : p.estadoProveedor
+
+    ];
+
+  });
+
+  const esc = v => `"${String(v ?? "").replaceAll('"','""')}"`;
+
+  const csv = "\uFEFF" + [encabezados,...filas].map(f => f.map(esc).join(",")).join("\r\n");
+
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+
+  a.href = url;
+
+  a.download = `pagos-as-click-${pagoFechaLocalInput(new Date())}.csv`;
+
+  document.body.appendChild(a);
+
+  a.click();
+
+  a.remove();
+
+  URL.revokeObjectURL(url);
+
+}
+
+function inicializarPagos(){
+
+  if (!document.getElementById("section-pagos")) return;
+
+  const hoy = new Date();
+
+  const desde = new Date(hoy);
+
+  desde.setDate(desde.getDate()-29);
+
+  const desdeEl = document.getElementById("paymentDateFrom");
+
+  const hastaEl = document.getElementById("paymentDateTo");
+
+  if (desdeEl && !desdeEl.value) desdeEl.value = pagoFechaLocalInput(desde);
+
+  if (hastaEl && !hastaEl.value) hastaEl.value = pagoFechaLocalInput(hoy);
+
+  ["paymentDateFrom","paymentDateTo","paymentTypeFilter","paymentStatusFilter"].forEach(id => {
+
+    document.getElementById(id)?.addEventListener("input",renderPayments);
+
+  });
+
+  document.getElementById("paymentExportBtn")?.addEventListener("click",exportarPagosCsv);
+
+  renderPayments();
+
+}
+
 function reportFechaLocalInput(fecha){
 
   const y = fecha.getFullYear();
@@ -3873,6 +4517,12 @@ function changeSection(section){
       fullMap?.invalidateSize();
 
     },80);
+
+  }
+
+  if (section === "pagos") {
+
+    setTimeout(renderPayments,30);
 
   }
 
@@ -5237,6 +5887,8 @@ function actualizarInterfazFirebase(){
   renderAuthorizations();
 
   renderTowQuotes();
+
+  renderPayments();
 
   renderProviderLocations();
 
@@ -7179,6 +7831,8 @@ renderVehicles();
 renderMemberships();
 
 setToday();
+
+inicializarPagos();
 
 inicializarReportes();
 
