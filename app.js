@@ -3348,7 +3348,7 @@ function fechaSolicitudProveedor(proveedor){
 
  
 
-  return formatearFecha(
+  return formatearFechaMembresia(
 
  
 
