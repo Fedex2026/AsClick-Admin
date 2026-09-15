@@ -4612,6 +4612,179 @@ document
 
   });
 
+function obtenerCoordenadasServicio(valor = {}){
+
+  const latitud = Number(
+    valor?.latitud ??
+    valor?.latitude ??
+    valor?.lat ??
+    null
+  );
+
+  const longitud = Number(
+    valor?.longitud ??
+    valor?.longitude ??
+    valor?.lng ??
+    valor?.lon ??
+    null
+  );
+
+  if (!Number.isFinite(latitud) || !Number.isFinite(longitud)) return null;
+
+  return { latitud, longitud };
+
+}
+
+function obtenerCoordenadasDesdeEnlace(enlace){
+
+  const textoEnlace = String(enlace || "");
+
+  const match = textoEnlace.match(
+    /[?&](?:q|query)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i
+  );
+
+  if (!match) return null;
+
+  return {
+    latitud: Number(match[1]),
+    longitud: Number(match[2])
+  };
+
+}
+
+function calcularDistanciaKmAdmin(origen,destino){
+
+  if (!origen || !destino) return null;
+
+  const rad = grados => grados * Math.PI / 180;
+  const radioTierraKm = 6371;
+
+  const dLat = rad(destino.latitud - origen.latitud);
+  const dLon = rad(destino.longitud - origen.longitud);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(rad(origen.latitud)) *
+    Math.cos(rad(destino.latitud)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+
+  return radioTierraKm * 2 * Math.atan2(Math.sqrt(a),Math.sqrt(1 - a));
+
+}
+
+function datosCotizacionGruaAdmin(datos = {}){
+
+  const grua = datos.grua || {};
+
+  const ubicacionEnlace =
+    datos.ubicacion?.enlaceGoogleMaps ||
+    datos.ubicacionDatos?.enlaceGoogleMaps ||
+    (typeof datos.ubicacion === "string" ? datos.ubicacion : "") ||
+    "";
+
+  const destinoDatos =
+    datos.destinoDatos ||
+    grua.destinoDatos ||
+    {};
+
+  const destinoTexto =
+    destinoDatos.direccion ||
+    destinoDatos.nombre ||
+    grua.destino ||
+    datos.destino ||
+    "-";
+
+  const destinoEnlace =
+    destinoDatos.enlaceGoogleMaps ||
+    destinoDatos.googleMapsUrl ||
+    "";
+
+  const origenCoords =
+    obtenerCoordenadasServicio(datos.ubicacion) ||
+    obtenerCoordenadasServicio(datos.ubicacionDatos) ||
+    obtenerCoordenadasDesdeEnlace(ubicacionEnlace);
+
+  const destinoCoords =
+    obtenerCoordenadasServicio(destinoDatos) ||
+    obtenerCoordenadasServicio(grua.destinoDatos) ||
+    obtenerCoordenadasDesdeEnlace(destinoEnlace);
+
+  const distanciaGuardada = Number(
+    grua.distanciaTrasladoKm ??
+    datos.distanciaTrasladoKm ??
+    datos.distanciaKm ??
+    destinoDatos.distanciaKm ??
+    null
+  );
+
+  const distanciaCalculada =
+    Number.isFinite(distanciaGuardada) && distanciaGuardada > 0
+      ? distanciaGuardada
+      : calcularDistanciaKmAdmin(origenCoords,destinoCoords);
+
+  const vehiculo = datos.vehiculo || datos.vehiculoDatos || {};
+
+  const tipoUnidad =
+    vehiculo.tipoUnidad ||
+    vehiculo.tipo ||
+    datos.tipoUnidad ||
+    grua.tipoUnidad ||
+    [vehiculo.marca,vehiculo.subMarca,vehiculo.modelo].filter(Boolean).join(" ") ||
+    "No especificada";
+
+  const carga = grua.esVehiculoCarga
+    ? `${grua.estadoCarga || ""} ${grua.tipoCarga || ""} ${grua.pesoCargaAproximado || ""}`.trim()
+    : "No";
+
+  return {
+    grua,
+    ubicacionEnlace,
+    destinoTexto,
+    destinoEnlace,
+    distanciaKm: Number.isFinite(distanciaCalculada)
+      ? Number(distanciaCalculada.toFixed(1))
+      : null,
+    tipoUnidad,
+    carga
+  };
+
+}
+
+window.enviarCotizacionGruaWhatsAppAdmin = id => {
+
+  const s = state.services.find(x => x.id === id);
+
+  if (!s || s.servicio !== "Grúa") return;
+
+  const datos = s.raw || {};
+  const info = datosCotizacionGruaAdmin(datos);
+
+  const mensaje = [
+    "AS CLICK - SOLICITUD DE COTIZACIÓN GRÚA",
+    `Folio: ${s.folio}`,
+    `Tipo / categoría de grúa: ${info.grua.categoria || "-"}`,
+    `Tipo de unidad: ${info.tipoUnidad}`,
+    `Condición: ${info.grua.condicion || "-"}`,
+    `Liberación: ${info.grua.liberacion || "-"}`,
+    `Carga: ${info.carga}`,
+    `Ubicación: ${info.ubicacionEnlace || "-"}`,
+    `Destino: ${info.destinoTexto}`,
+    info.destinoEnlace ? `GPS destino: ${info.destinoEnlace}` : "",
+    `Distancia ubicación → destino: ${info.distanciaKm != null ? `${info.distanciaKm} km` : "No disponible"}`,
+    datos.comentarios || info.grua.comentarios
+      ? `Comentarios: ${datos.comentarios || info.grua.comentarios}`
+      : "",
+    "",
+    "Favor de enviar costo y tiempo estimado."
+  ].filter(Boolean).join("\n");
+
+  const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+  window.open(url,"_blank","noopener,noreferrer");
+
+};
+
 window.openService = folio => {
 
   const s = state.services.find(x => x.folio === folio);
@@ -4630,6 +4803,10 @@ window.openService = folio => {
 
     "";
 
+  const infoGrua = s.servicio === "Grúa"
+    ? datosCotizacionGruaAdmin(datos)
+    : null;
+
   openModal(
 
     `Servicio ${s.folio}`,
@@ -4646,7 +4823,13 @@ window.openService = folio => {
 
       <p><b>Hora:</b> ${escaparHtml(s.hora)}</p>
 
-      ${datos.grua ? `<p><b>Categoría grúa:</b> ${escaparHtml(datos.grua.categoria || "-")}</p><p><b>Condición:</b> ${escaparHtml(datos.grua.condicion || "-")}</p><p><b>Carga:</b> ${datos.grua.esVehiculoCarga ? escaparHtml(`${datos.grua.estadoCarga || ""} ${datos.grua.tipoCarga || ""} ${datos.grua.pesoCargaAproximado || ""}`.trim()) : "No"}</p>` : ""}
+      ${datos.grua ? `
+        <p><b>Categoría grúa:</b> ${escaparHtml(datos.grua.categoria || "-")}</p>
+        <p><b>Tipo de unidad:</b> ${escaparHtml(infoGrua?.tipoUnidad || "No especificada")}</p>
+        <p><b>Condición:</b> ${escaparHtml(datos.grua.condicion || "-")}</p>
+        <p><b>Liberación:</b> ${escaparHtml(datos.grua.liberacion || "-")}</p>
+        <p><b>Carga:</b> ${escaparHtml(infoGrua?.carga || "No")}</p>
+      ` : ""}
 
       ${
 
@@ -4658,11 +4841,19 @@ window.openService = folio => {
 
       }
 
+      ${infoGrua ? `
+        <p><b>Destino:</b> ${escaparHtml(infoGrua.destinoTexto)}</p>
+        ${infoGrua.destinoEnlace ? `<p><b>GPS destino:</b> ${escaparHtml(infoGrua.destinoEnlace)}</p>` : ""}
+        <p><b>Distancia ubicación → destino:</b> ${infoGrua.distanciaKm != null ? `${escaparHtml(infoGrua.distanciaKm)} km` : "No disponible"}</p>
+      ` : ""}
+
       <div class="cardActions">
 
         <button onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Reasignar proveedor</button>
 
         <button onclick="abrirUbicacionServicio('${escaparHtml(s.id)}')">Ver ubicación</button>
+
+        ${s.servicio === "Grúa" ? `<button onclick="enviarCotizacionGruaWhatsAppAdmin('${escaparHtml(s.id)}')">Enviar a grupo de Grúas por WhatsApp</button>` : ""}
 
       </div>
 
