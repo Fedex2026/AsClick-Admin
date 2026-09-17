@@ -16095,22 +16095,39 @@ function htmlFormularioReporteTelefonico(){
           </div>
         </div>
 
-        <div>
+        <div id="rtUbicacionNormalBox">
           <label><b>Ubicación del servicio</b></label>
-          <input id="rtUbicacion" type="text" placeholder="Liga de Google Maps, dirección o referencia"
-            style="width:100%;margin-top:7px;">
+          <div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;">
+            <input id="rtUbicacion" type="text" placeholder="Liga de Google Maps, dirección o referencia"
+              style="flex:1;min-width:260px;">
+            <button type="button" onclick="usarGpsReporteTelefonico('servicio')">📍 Usar GPS</button>
+          </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div id="rtUbicacionesGruaBox" style="display:none;">
           <div>
-            <label><b>Latitud</b></label>
-            <input id="rtLatitud" type="number" step="any" placeholder="19.4326" style="width:100%;margin-top:7px;">
+            <label><b>Origen / ubicación del vehículo</b></label>
+            <div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;">
+              <input id="rtGruaOrigen" type="text" placeholder="Liga de Google Maps, dirección o referencia"
+                style="flex:1;min-width:260px;">
+              <button type="button" onclick="usarGpsReporteTelefonico('origen')">📍 GPS origen</button>
+            </div>
           </div>
-          <div>
-            <label><b>Longitud</b></label>
-            <input id="rtLongitud" type="number" step="any" placeholder="-99.1332" style="width:100%;margin-top:7px;">
+
+          <div style="margin-top:12px;">
+            <label><b>Destino</b></label>
+            <div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;">
+              <input id="rtGruaDestinoGps" type="text" placeholder="Liga de Google Maps, dirección o referencia"
+                style="flex:1;min-width:260px;">
+              <button type="button" onclick="usarGpsReporteTelefonico('destino')">📍 GPS destino</button>
+            </div>
           </div>
         </div>
+
+        <input id="rtLatitud" type="hidden">
+        <input id="rtLongitud" type="hidden">
+        <input id="rtGruaDestinoLatitud" type="hidden">
+        <input id="rtGruaDestinoLongitud" type="hidden">
 
         <div id="rtProveedorManualBox" style="display:none;">
           <label><b>Proveedor para asignación manual</b></label>
@@ -16137,8 +16154,7 @@ function htmlFormularioReporteTelefonico(){
               <option value="Sí">Tiene carga</option>
             </select>
           </div>
-          <input id="rtGruaDestino" type="text" placeholder="Destino de la grúa"
-            style="width:100%;margin-top:12px;">
+
         </div>
 
         <div>
@@ -16184,6 +16200,7 @@ function instalarReporteTelefonicoAdmin(){
     actualizarProveedoresManualesReporteTelefonico();
   });
 
+
   document.getElementById("rtCrearBtn")?.addEventListener("click",crearReporteTelefonico);
 
   const btnAnterior = document.getElementById("newServiceBtn");
@@ -16199,7 +16216,6 @@ function mostrarResultadosReporteTelefonico(){
   if (!cont) return;
   const termino = document.getElementById("rtBusqueda")?.value || "";
   if (normalizarBusquedaReporteTelefonico(termino).length < 2) {
-
     cont.innerHTML = "";
     return;
   }
@@ -16252,16 +16268,72 @@ function actualizarCamposReporteTelefonico(){
   const modo = document.getElementById("rtModoAsignacion")?.value || "automatica";
   const grua = document.getElementById("rtCamposGrua");
   const manual = document.getElementById("rtProveedorManualBox");
+  const ubicacionNormal = document.getElementById("rtUbicacionNormalBox");
+  const ubicacionesGrua = document.getElementById("rtUbicacionesGruaBox");
   if (grua) grua.style.display = tipo === "Grúa" ? "block" : "none";
+  if (ubicacionNormal) ubicacionNormal.style.display = tipo === "Grúa" ? "none" : "block";
+  if (ubicacionesGrua) ubicacionesGrua.style.display = tipo === "Grúa" ? "block" : "none";
   if (manual) manual.style.display = modo === "manual" ? "block" : "none";
 }
+
+
+window.usarGpsReporteTelefonico = destino => {
+  if (!navigator.geolocation) {
+    window.alert("Este navegador no permite obtener la ubicación por GPS.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    posicion => {
+      const lat = Number(posicion.coords.latitude);
+      const lng = Number(posicion.coords.longitude);
+      const liga = `https://www.google.com/maps?q=${lat},${lng}`;
+
+      if (destino === "destino") {
+        const campo = document.getElementById("rtGruaDestinoGps");
+        if (campo) campo.value = liga;
+        const latDestino = document.getElementById("rtGruaDestinoLatitud");
+        const lngDestino = document.getElementById("rtGruaDestinoLongitud");
+        if (latDestino) latDestino.value = lat;
+        if (lngDestino) lngDestino.value = lng;
+      } else {
+        const campo = document.getElementById(
+          destino === "origen" ? "rtGruaOrigen" : "rtUbicacion"
+        );
+        if (campo) campo.value = liga;
+        const latitud = document.getElementById("rtLatitud");
+        const longitud = document.getElementById("rtLongitud");
+        if (latitud) latitud.value = lat;
+        if (longitud) longitud.value = lng;
+      }
+
+      actualizarProveedoresManualesReporteTelefonico();
+    },
+    error => {
+      const mensajes = {
+        1:"No se concedió permiso para usar la ubicación.",
+        2:"No fue posible determinar la ubicación.",
+        3:"La búsqueda de ubicación tardó demasiado."
+      };
+      window.alert(mensajes[error.code] || "No fue posible obtener la ubicación.");
+    },
+    {
+      enableHighAccuracy:true,
+      timeout:12000,
+      maximumAge:0
+    }
+  );
+};
 
 function coordsReporteTelefonico(){
   let lat = Number(document.getElementById("rtLatitud")?.value);
   let lng = Number(document.getElementById("rtLongitud")?.value);
   if (Number.isFinite(lat) && Number.isFinite(lng)) return {latitud:lat,longitud:lng};
 
-  const texto = document.getElementById("rtUbicacion")?.value || "";
+  const tipo = document.getElementById("rtTipoServicio")?.value || "";
+  const texto = tipo === "Grúa"
+    ? (document.getElementById("rtGruaOrigen")?.value || "")
+    : (document.getElementById("rtUbicacion")?.value || "");
   const m = texto.match(/(?:q=|@)(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/i);
   if (m) {
     lat = Number(m[1]); lng = Number(m[2]);
@@ -16308,6 +16380,7 @@ function proveedoresConDistanciaReporteTelefonico(tipo,origen){
 function actualizarProveedoresManualesReporteTelefonico(){
   const select = document.getElementById("rtProveedorManual");
   if (!select) return;
+
   const tipo = document.getElementById("rtTipoServicio")?.value || "";
   if (!tipo) {
     select.innerHTML = `<option value="">Selecciona primero el tipo de servicio</option>`;
@@ -16354,7 +16427,9 @@ async function crearReporteTelefonico(){
   const vehiculoId = document.getElementById("rtVehiculoId")?.value || "";
   const tipo = document.getElementById("rtTipoServicio")?.value || "";
   const modo = document.getElementById("rtModoAsignacion")?.value || "automatica";
-  const ubicacionTexto = document.getElementById("rtUbicacion")?.value?.trim() || "";
+  const ubicacionTexto = tipo === "Grúa"
+    ? (document.getElementById("rtGruaOrigen")?.value?.trim() || "")
+    : (document.getElementById("rtUbicacion")?.value?.trim() || "");
   const origen = coordsReporteTelefonico();
 
   if (!uidCliente) return window.alert("Selecciona un cliente por nombre, membresía o placas.");
@@ -16380,7 +16455,6 @@ async function crearReporteTelefonico(){
     }
     const pc = ubicacionProveedorReporteTelefonico(proveedor);
     distanciaProveedorKm = origen && pc ? calcularDistanciaKmAdmin(origen,pc) : null;
-
   } else {
     const candidatos = proveedoresConDistanciaReporteTelefonico(tipo,origen)
       .filter(x => x.distancia != null);
@@ -16451,7 +16525,9 @@ async function crearReporteTelefonico(){
       liberacion:document.getElementById("rtGruaLiberacion")?.value || "",
       tieneCarga:document.getElementById("rtGruaCarga")?.value === "Sí",
       carga:document.getElementById("rtGruaCarga")?.value || "No",
-      destino:document.getElementById("rtGruaDestino")?.value?.trim() || ""
+      destino:document.getElementById("rtGruaDestinoGps")?.value?.trim() || "",
+      destinoLatitud:Number(document.getElementById("rtGruaDestinoLatitud")?.value) || null,
+      destinoLongitud:Number(document.getElementById("rtGruaDestinoLongitud")?.value) || null
     };
   }
 
@@ -16485,7 +16561,8 @@ async function crearReporteTelefonico(){
 }
 
 window.limpiarReporteTelefonico = () => {
-  const ids = ["rtBusqueda","rtUidCliente","rtVehiculoId","rtUbicacion","rtLatitud","rtLongitud","rtObservaciones","rtGruaDestino"];
+
+  const ids = ["rtBusqueda","rtUidCliente","rtVehiculoId","rtUbicacion","rtGruaOrigen","rtGruaDestinoGps","rtLatitud","rtLongitud","rtGruaDestinoLatitud","rtGruaDestinoLongitud","rtObservaciones"];
   ids.forEach(id => { const e=document.getElementById(id); if(e) e.value=""; });
   const cliente = document.getElementById("rtClienteSeleccionado");
   const resultados = document.getElementById("rtResultados");
@@ -16561,7 +16638,6 @@ drawIncomeChart();
 
 window.suspenderProveedorAdmin = async id => {
   const proveedor = state.providers.find(p => p.id === id);
-
   if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
 
   if (proveedorTieneServicioActivo(proveedor)) {
