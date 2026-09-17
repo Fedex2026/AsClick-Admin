@@ -16020,6 +16020,7 @@ function buscarCoincidenciasReporteTelefonico(termino){
   const vistos = new Set();
 
 
+
   state.clients.forEach(cliente => {
     const dc = datosClienteReporteTelefonico(cliente);
     const camposCliente = [dc.nombre,dc.membresia,dc.telefono].map(normalizarBusquedaReporteTelefonico);
@@ -16198,6 +16199,7 @@ function instalarReporteTelefonicoAdmin(){
   document.getElementById("rtModoAsignacion")?.addEventListener("change",() => {
     actualizarCamposReporteTelefonico();
     actualizarProveedoresManualesReporteTelefonico();
+
   });
 
 
@@ -16379,6 +16381,7 @@ function instalarAutocompletadoDireccionReporteTelefonico(inputId,tipo){
     lista.style.width = `${r.width}px`;
   };
 
+
   input.addEventListener("input",() => {
 
     clearTimeout(temporizadorDireccionReporteTelefonico);
@@ -16558,6 +16561,7 @@ async function crearReporteTelefonico(){
   const origen = coordsReporteTelefonico();
 
   if (!uidCliente) return window.alert("Selecciona un cliente por nombre, membresía o placas.");
+
   if (!tipo) return window.alert("Selecciona el tipo de servicio.");
   if (!ubicacionTexto && !origen) return window.alert("Captura la ubicación del servicio.");
   if (modo === "automatica" && !origen) {
@@ -16802,7 +16806,36 @@ window.liberarOperadorAdmin = async id => {
   );
 
   if (!servicio) {
-    openModal("Sin servicio activo","<p>No se encontró un servicio activo asignado a este proveedor.</p>");
+    if (!window.confirm(
+      `No se encontró un servicio activo para ${proveedor.name}, pero el proveedor aparece ocupado. ¿Forzar su liberación y dejarlo Disponible?`
+    )) return;
+
+    try {
+      await firestoreUpdateDoc(
+        firestoreDoc(db,"proveedores",proveedor.id),
+        {
+          disponible:true,
+          ocupado:false,
+          estadoConexion:"disponible",
+          servicioActualId:null,
+          ultimaActualizacion:firestoreServerTimestamp(),
+          liberadoForzadoPorAdmin:true,
+          fechaLiberacionForzadaAdmin:firestoreServerTimestamp()
+        }
+      );
+
+      openModal(
+        "Operador liberado",
+        `<p><b>${escaparHtml(proveedor.name)}</b> no tenía un servicio activo registrado.</p>
+         <p>Se limpió el estado atorado y quedó <b>Disponible</b>.</p>`
+      );
+    } catch(error) {
+      console.error("Error liberando operador atorado:",error);
+      openModal(
+        "No fue posible liberar al operador",
+        `<p>${escaparHtml(error?.message || String(error))}</p>`
+      );
+    }
     return;
   }
 
