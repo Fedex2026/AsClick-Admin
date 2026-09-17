@@ -16553,9 +16553,20 @@ function instalarAutocompletadosReporteTelefonico(){
 
 
 function coordsReporteTelefonico(){
-  let lat = Number(document.getElementById("rtLatitud")?.value);
-  let lng = Number(document.getElementById("rtLongitud")?.value);
-  if (Number.isFinite(lat) && Number.isFinite(lng)) return {latitud:lat,longitud:lng};
+  const latRaw = document.getElementById("rtLatitud")?.value?.trim() || "";
+  const lngRaw = document.getElementById("rtLongitud")?.value?.trim() || "";
+  let lat = latRaw === "" ? NaN : Number(latRaw);
+  let lng = lngRaw === "" ? NaN : Number(lngRaw);
+
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180 &&
+    !(lat === 0 && lng === 0)
+  ) {
+    return {latitud:lat,longitud:lng};
+  }
 
   const tipo = document.getElementById("rtTipoServicio")?.value || "";
   const texto = tipo === "Grúa"
@@ -16563,8 +16574,15 @@ function coordsReporteTelefonico(){
     : (document.getElementById("rtUbicacion")?.value || "");
   const m = texto.match(/(?:q=|@)(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/i);
   if (m) {
-    lat = Number(m[1]); lng = Number(m[2]);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    lat = Number(m[1]);
+    lng = Number(m[2]);
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      lat >= -90 && lat <= 90 &&
+      lng >= -180 && lng <= 180 &&
+      !(lat === 0 && lng === 0)
+    ) {
       document.getElementById("rtLatitud").value = lat;
       document.getElementById("rtLongitud").value = lng;
       return {latitud:lat,longitud:lng};
@@ -16658,7 +16676,29 @@ async function crearReporteTelefonico(){
   const ubicacionTexto = tipo === "Grúa"
     ? (document.getElementById("rtGruaOrigen")?.value?.trim() || "")
     : (document.getElementById("rtUbicacion")?.value?.trim() || "");
-  const origen = coordsReporteTelefonico();
+  let origen = coordsReporteTelefonico();
+
+  if (!origen && ubicacionTexto) {
+    const coincidenciasDireccion = await buscarDireccionesReporteTelefonico(ubicacionTexto);
+    const primeraDireccion = coincidenciasDireccion?.[0] || null;
+
+    if (primeraDireccion) {
+      const lat = Number(primeraDireccion.lat);
+      const lng = Number(primeraDireccion.lon);
+
+      if (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        lat >= -90 && lat <= 90 &&
+        lng >= -180 && lng <= 180 &&
+        !(lat === 0 && lng === 0)
+      ) {
+        document.getElementById("rtLatitud").value = lat;
+        document.getElementById("rtLongitud").value = lng;
+        origen = {latitud:lat,longitud:lng};
+      }
+    }
+  }
 
   if (!uidCliente && !clienteSinMembresiaManual) {
     return window.alert("Selecciona un cliente registrado o continúa como cliente sin membresía.");
@@ -16720,7 +16760,6 @@ async function crearReporteTelefonico(){
     folio,
     folioOficial:folio,
     canal:"telefono",
-
     origenSolicitud:"admin_reporte_telefonico",
     creadoPorAdmin:true,
     tipoServicio:tipo,
@@ -16902,6 +16941,7 @@ window.suspenderProveedorAdmin = async id => {
   const proveedor = state.providers.find(p => p.id === id);
   if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
 
+
   if (proveedorTieneServicioActivo(proveedor)) {
     openModal(
       "Proveedor ocupado",
@@ -16941,7 +16981,6 @@ window.liberarOperadorAdmin = async id => {
   if (!servicio) {
     if (!window.confirm(
       `No se encontró un servicio activo para ${proveedor.name}, pero el proveedor aparece ocupado. ¿Forzar su liberación y dejarlo Disponible?`
-
     )) return;
 
     try {
