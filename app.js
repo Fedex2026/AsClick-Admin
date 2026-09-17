@@ -16327,14 +16327,11 @@ function actualizarProveedoresManualesReporteTelefonico(){
 
 function generarFolioReporteTelefonico(){
   const ahora = new Date();
-  const y = ahora.getFullYear();
+  const y = String(ahora.getFullYear()).slice(-2);
   const m = String(ahora.getMonth()+1).padStart(2,"0");
   const d = String(ahora.getDate()).padStart(2,"0");
-  const h = String(ahora.getHours()).padStart(2,"0");
-  const min = String(ahora.getMinutes()).padStart(2,"0");
-  const s = String(ahora.getSeconds()).padStart(2,"0");
-  const aleatorio = String(Math.floor(Math.random()*1000)).padStart(3,"0");
-  return `TEL-${y}${m}${d}-${h}${min}${s}-${aleatorio}`;
+  const aleatorio = String(Math.floor(Math.random()*10000)).padStart(4,"0");
+  return `ASC-${y}${m}${d}-${aleatorio}`;
 }
 
 async function marcarProveedorOcupadoReporteTelefonico(proveedor,solicitudId){
@@ -16380,10 +16377,10 @@ async function crearReporteTelefonico(){
 
   if (modo === "manual") {
     const proveedorId = document.getElementById("rtProveedorManual")?.value || "";
-
     proveedor = state.providers.find(p => p.id === proveedorId) || null;
     if (!proveedor) return window.alert("Selecciona un proveedor para la asignación manual.");
     if (!proveedorDisponibleParaServicio(proveedor,{servicio:tipo})) {
+
       return window.alert("Ese proveedor ya no está disponible.");
     }
     const pc = ubicacionProveedorReporteTelefonico(proveedor);
@@ -16558,5 +16555,104 @@ initMaps();
 drawIncomeChart();
 
  
+
+
+/* =========================================================
+   AS CLICK - PARCHE ÚNICO: SUSPENDER / REACTIVAR PROVEEDOR
+   No sustituye "Dar de baja". Agrega una acción independiente.
+   ========================================================= */
+
+
+function proveedorSuspendidoTemporalmenteAdmin(proveedor){
+  return proveedor?.raw?.suspendidoTemporalAdmin === true;
+}
+
+window.suspenderProveedorTemporalAdmin = async proveedorId => {
+  const proveedor = state.providers.find(p => p.id === proveedorId);
+  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
+
+  const suspendido = proveedorSuspendidoTemporalmenteAdmin(proveedor);
+  const accion = suspendido ? "reactivar" : "suspender";
+
+  if (!window.confirm(`¿${suspendido ? "Reactivar" : "Suspender"} temporalmente a ${proveedor.name}?`)) return;
+
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"proveedores",proveedor.id),
+      suspendido
+        ? {
+            suspendidoTemporalAdmin:false,
+            suspendido:false,
+            activo:true,
+            disponible:true,
+            estadoConexion:"disponible",
+            ultimaActualizacion:firestoreServerTimestamp()
+          }
+        : {
+            suspendidoTemporalAdmin:true,
+            suspendido:true,
+            disponible:false,
+            estadoConexion:"suspendido",
+            ultimaActualizacion:firestoreServerTimestamp()
+          }
+    );
+  } catch(error) {
+    console.error(`Error al ${accion} proveedor:`,error);
+    openModal(
+      `No fue posible ${accion} al proveedor`,
+      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  }
+};
+
+function agregarBotonesSuspenderProveedorAdmin(){
+  const seccion = document.getElementById("section-proveedores");
+  if (!seccion) return;
+
+  const tarjetas = [...seccion.querySelectorAll(".card")];
+
+  tarjetas.forEach(tarjeta => {
+    const botonFicha = [...tarjeta.querySelectorAll("button")]
+      .find(b => b.textContent.trim() === "Ver ficha");
+
+    if (!botonFicha) return;
+
+    const contenedor = botonFicha.parentElement;
+    if (!contenedor || contenedor.querySelector("[data-suspender-proveedor-admin]")) return;
+
+    const botonBaja = [...contenedor.querySelectorAll("button")]
+      .find(b => b.textContent.trim() === "Dar de baja" || b.textContent.trim() === "Dar de alta");
+
+    if (!botonBaja) return;
+
+    const onclickFicha = botonFicha.getAttribute("onclick") || "";
+    const match = onclickFicha.match(/openProvider\(['"]([^'"]+)['"]\)/);
+    if (!match) return;
+
+    const proveedorId = match[1];
+    const proveedor = state.providers.find(p => p.id === proveedorId);
+    if (!proveedor) return;
+
+    const boton = document.createElement("button");
+    boton.type = "button";
+    boton.dataset.suspenderProveedorAdmin = proveedorId;
+    boton.className = proveedorSuspendidoTemporalmenteAdmin(proveedor) ? "approve" : "reject";
+    boton.textContent = proveedorSuspendidoTemporalmenteAdmin(proveedor)
+      ? "Reactivar proveedor"
+      : "Suspender proveedor";
+    boton.onclick = () => window.suspenderProveedorTemporalAdmin(proveedorId);
+
+    contenedor.insertBefore(boton,botonBaja);
+  });
+}
+
+const _renderProvidersAntesDeSuspenderAdmin = renderProviders;
+renderProviders = function(){
+  _renderProvidersAntesDeSuspenderAdmin();
+  agregarBotonesSuspenderProveedorAdmin();
+};
+
+/* FIN PARCHE SUSPENDER / REACTIVAR PROVEEDOR */
+
 
 iniciarFirebaseAdmin();
