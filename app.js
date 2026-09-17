@@ -16202,6 +16202,7 @@ function instalarReporteTelefonicoAdmin(){
 
 
   document.getElementById("rtCrearBtn")?.addEventListener("click",crearReporteTelefonico);
+  instalarAutocompletadosReporteTelefonico();
 
   const btnAnterior = document.getElementById("newServiceBtn");
   if (btnAnterior) {
@@ -16277,6 +16278,21 @@ function actualizarCamposReporteTelefonico(){
 }
 
 
+async function obtenerDireccionDesdeCoordenadasReporteTelefonico(lat,lng){
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&addressdetails=1&accept-language=es`;
+    const respuesta = await fetch(url,{
+      headers:{"Accept":"application/json"}
+    });
+    if (!respuesta.ok) throw new Error("No fue posible consultar la dirección.");
+    const datos = await respuesta.json();
+    return datos?.display_name || `${lat}, ${lng}`;
+  } catch(error) {
+    console.warn("No fue posible convertir GPS a dirección:",error);
+    return `${lat}, ${lng}`;
+  }
+}
+
 window.usarGpsReporteTelefonico = destino => {
   if (!navigator.geolocation) {
     window.alert("Este navegador no permite obtener la ubicación por GPS.");
@@ -16284,14 +16300,15 @@ window.usarGpsReporteTelefonico = destino => {
   }
 
   navigator.geolocation.getCurrentPosition(
-    posicion => {
+    async posicion => {
       const lat = Number(posicion.coords.latitude);
       const lng = Number(posicion.coords.longitude);
-      const liga = `https://www.google.com/maps?q=${lat},${lng}`;
+      const direccion = await obtenerDireccionDesdeCoordenadasReporteTelefonico(lat,lng);
 
       if (destino === "destino") {
         const campo = document.getElementById("rtGruaDestinoGps");
-        if (campo) campo.value = liga;
+        if (campo) campo.value = direccion;
+
         const latDestino = document.getElementById("rtGruaDestinoLatitud");
         const lngDestino = document.getElementById("rtGruaDestinoLongitud");
         if (latDestino) latDestino.value = lat;
@@ -16300,7 +16317,8 @@ window.usarGpsReporteTelefonico = destino => {
         const campo = document.getElementById(
           destino === "origen" ? "rtGruaOrigen" : "rtUbicacion"
         );
-        if (campo) campo.value = liga;
+        if (campo) campo.value = direccion;
+
         const latitud = document.getElementById("rtLatitud");
         const longitud = document.getElementById("rtLongitud");
         if (latitud) latitud.value = lat;
@@ -16324,6 +16342,114 @@ window.usarGpsReporteTelefonico = destino => {
     }
   );
 };
+
+
+let temporizadorDireccionReporteTelefonico = null;
+
+async function buscarDireccionesReporteTelefonico(texto){
+  const q = String(texto || "").trim();
+  if (q.length < 4) return [];
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=mx&accept-language=es&q=${encodeURIComponent(q)}`;
+    const respuesta = await fetch(url,{
+      headers:{"Accept":"application/json"}
+    });
+    if (!respuesta.ok) return [];
+    return await respuesta.json();
+  } catch(error) {
+    console.warn("No fue posible buscar direcciones:",error);
+    return [];
+  }
+}
+
+function instalarAutocompletadoDireccionReporteTelefonico(inputId,tipo){
+  const input = document.getElementById(inputId);
+  if (!input || input.dataset.autocompleteDireccion === "1") return;
+  input.dataset.autocompleteDireccion = "1";
+
+  const lista = document.createElement("div");
+  lista.style.cssText = "display:none;position:absolute;z-index:9999;background:#0f1f2d;border:1px solid #35506a;border-radius:8px;max-height:240px;overflow:auto;box-shadow:0 8px 22px rgba(0,0,0,.35);";
+  document.body.appendChild(lista);
+
+  const posicionar = () => {
+    const r = input.getBoundingClientRect();
+    lista.style.left = `${r.left + window.scrollX}px`;
+    lista.style.top = `${r.bottom + window.scrollY + 4}px`;
+    lista.style.width = `${r.width}px`;
+  };
+
+  input.addEventListener("input",() => {
+
+    clearTimeout(temporizadorDireccionReporteTelefonico);
+    const texto = input.value.trim();
+
+    if (texto.length < 4) {
+      lista.style.display = "none";
+      lista.innerHTML = "";
+      return;
+    }
+
+    temporizadorDireccionReporteTelefonico = setTimeout(async () => {
+      const resultados = await buscarDireccionesReporteTelefonico(texto);
+      lista.innerHTML = "";
+
+      if (!resultados.length) {
+        lista.style.display = "none";
+        return;
+      }
+
+      resultados.forEach(resultado => {
+        const opcion = document.createElement("button");
+        opcion.type = "button";
+        opcion.textContent = resultado.display_name || "";
+        opcion.style.cssText = "display:block;width:100%;padding:10px 12px;text-align:left;background:transparent;color:#fff;border:0;border-bottom:1px solid #29435c;cursor:pointer;";
+        opcion.addEventListener("click",() => {
+          input.value = resultado.display_name || "";
+          const lat = Number(resultado.lat);
+          const lng = Number(resultado.lon);
+
+          if (tipo === "destino") {
+            const latDestino = document.getElementById("rtGruaDestinoLatitud");
+            const lngDestino = document.getElementById("rtGruaDestinoLongitud");
+            if (latDestino) latDestino.value = lat;
+            if (lngDestino) lngDestino.value = lng;
+          } else {
+            const latitud = document.getElementById("rtLatitud");
+            const longitud = document.getElementById("rtLongitud");
+            if (latitud) latitud.value = lat;
+            if (longitud) longitud.value = lng;
+          }
+
+          lista.style.display = "none";
+          lista.innerHTML = "";
+          actualizarProveedoresManualesReporteTelefonico();
+        });
+        lista.appendChild(opcion);
+      });
+
+      posicionar();
+      lista.style.display = "block";
+    },450);
+  });
+
+  input.addEventListener("focus",posicionar);
+  window.addEventListener("resize",posicionar);
+  window.addEventListener("scroll",posicionar,true);
+
+  document.addEventListener("click",e => {
+    if (e.target !== input && !lista.contains(e.target)) {
+      lista.style.display = "none";
+    }
+  });
+}
+
+function instalarAutocompletadosReporteTelefonico(){
+  instalarAutocompletadoDireccionReporteTelefonico("rtUbicacion","servicio");
+  instalarAutocompletadoDireccionReporteTelefonico("rtGruaOrigen","origen");
+  instalarAutocompletadoDireccionReporteTelefonico("rtGruaDestinoGps","destino");
+}
+
 
 function coordsReporteTelefonico(){
   let lat = Number(document.getElementById("rtLatitud")?.value);
@@ -16380,7 +16506,6 @@ function proveedoresConDistanciaReporteTelefonico(tipo,origen){
 function actualizarProveedoresManualesReporteTelefonico(){
   const select = document.getElementById("rtProveedorManual");
   if (!select) return;
-
   const tipo = document.getElementById("rtTipoServicio")?.value || "";
   if (!tipo) {
     select.innerHTML = `<option value="">Selecciona primero el tipo de servicio</option>`;
@@ -16436,6 +16561,7 @@ async function crearReporteTelefonico(){
   if (!tipo) return window.alert("Selecciona el tipo de servicio.");
   if (!ubicacionTexto && !origen) return window.alert("Captura la ubicación del servicio.");
   if (modo === "automatica" && !origen) {
+
     return window.alert("Para asignar al proveedor más cercano captura latitud y longitud o pega una liga de Google Maps con coordenadas.");
   }
 
@@ -16561,7 +16687,6 @@ async function crearReporteTelefonico(){
 }
 
 window.limpiarReporteTelefonico = () => {
-
   const ids = ["rtBusqueda","rtUidCliente","rtVehiculoId","rtUbicacion","rtGruaOrigen","rtGruaDestinoGps","rtLatitud","rtLongitud","rtGruaDestinoLatitud","rtGruaDestinoLongitud","rtObservaciones"];
   ids.forEach(id => { const e=document.getElementById(id); if(e) e.value=""; });
   const cliente = document.getElementById("rtClienteSeleccionado");
