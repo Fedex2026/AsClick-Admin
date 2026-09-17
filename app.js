@@ -1,4 +1,4 @@
-AS CLICK ADMIN - bloqueo y reactivación de proveedores
+AS CLICK ADMIN - ORIGINAL RESTAURADO
 
 const state = {
 
@@ -1156,31 +1156,7 @@ function convertirSolicitud(doc){
 
  
 
-function proveedorBloqueoVigenteDatos(datos = {}) {
-
-  if (datos.bloqueoAdmin !== true) return false;
-
-  const hasta = datos.bloqueoHasta;
-
-  if (!hasta) return true;
-
-  let ms = 0;
-
-  if (typeof hasta?.toDate === "function") ms = hasta.toDate().getTime();
-
-  else if (typeof hasta?.seconds === "number") ms = hasta.seconds * 1000;
-
-  else ms = new Date(hasta).getTime();
-
-  return !Number.isFinite(ms) || ms > Date.now();
-
-}
-
- 
-
 function obtenerEstadoProveedor(datos = {}){
-
-  if (proveedorBloqueoVigenteDatos(datos)) return "Bloqueado";
 
  
 
@@ -2012,14 +1988,6 @@ function proveedorCoincideConUid(proveedor, uid){
 
  
 
-function proveedorEstaBloqueado(proveedor){
-
-  return proveedorBloqueoVigenteDatos(proveedor?.raw || {});
-
-}
-
- 
-
 function proveedorEstaDeBaja(proveedor){
 
  
@@ -2058,7 +2026,9 @@ function proveedorEstaDeBaja(proveedor){
 
 function proveedorTieneServicioActivo(proveedor){
 
-  if (proveedorEstaBloqueado(proveedor) || proveedorEstaDeBaja(proveedor)) return false;
+ 
+
+  if (proveedorEstaDeBaja(proveedor)) return false;
 
  
 
@@ -2112,11 +2082,7 @@ function proveedorTieneServicioActivo(proveedor){
 
 function estadoProveedorEnTiempoReal(proveedor){
 
-  if (proveedorEstaBloqueado(proveedor)) {
-
-    return "Bloqueado";
-
-  }
+ 
 
   if (proveedorEstaDeBaja(proveedor)) {
 
@@ -2290,9 +2256,9 @@ function recalcularKpis(){
 
  
 
-      !proveedorEstaBloqueado(p) &&
-
       !proveedorTieneServicioActivo(p) &&
+
+ 
 
       p.status === "Disponible"
 
@@ -3780,21 +3746,19 @@ function renderProviders(){
 
               ${
 
-                p.status === "Bloqueado"
+ 
 
-                  ? `<button class="approve" onclick="reactivarProveedorBloqueado('${escaparHtml(p.id)}')">Reactivar</button>`
+                p.status === "Baja"
 
-                  : p.status === "Baja"
+ 
 
-                    ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
+                  ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
 
-                    : `
+ 
 
-                        <button class="reject" onclick="bloquearProveedor('${escaparHtml(p.id)}')">Bloquear</button>
+                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
 
-                        <button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>
-
-                      `
+ 
 
               }
 
@@ -10640,27 +10604,19 @@ window.openProvider = id => {
 
         ${
 
-          estadoActual === "Bloqueado"
+ 
 
-            ? `
+          estadoActual === "Baja"
 
-                <p><b>Motivo del bloqueo:</b> ${escaparHtml(p.raw?.bloqueoMotivo || "Sin motivo registrado")}</p>
+ 
 
-                <button class="approve" onclick="closeModal();reactivarProveedorBloqueado('${escaparHtml(p.id)}')">Reactivar</button>
+            ? `<button class="approve" onclick="closeModal();darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
 
-              `
+ 
 
-            : estadoActual === "Baja"
+            : `<button class="reject" onclick="closeModal();darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
 
-              ? `<button class="approve" onclick="closeModal();darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
-
-              : `
-
-                  <button class="reject" onclick="closeModal();bloquearProveedor('${escaparHtml(p.id)}')">Bloquear</button>
-
-                  <button class="reject" onclick="closeModal();darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>
-
-                `
+ 
 
         }
 
@@ -10677,162 +10633,6 @@ window.openProvider = id => {
   );
 
  
-
-};
-
- 
-
-window.bloquearProveedor = async id => {
-
-  const proveedor = state.providers.find(p => p.id === id);
-
-  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
-
- 
-
-  if (proveedorTieneServicioActivo(proveedor)) {
-
-    openModal("Proveedor ocupado","<p>No se puede bloquear a este proveedor mientras tenga un servicio activo. Finaliza o reasigna primero el servicio.</p>");
-
-    return;
-
-  }
-
- 
-
-  const motivo = window.prompt(`Motivo del bloqueo de ${proveedor.name}:`, "");
-
-  if (motivo === null) return;
-
-  if (!String(motivo).trim()) {
-
-    window.alert("Escribe el motivo del bloqueo.");
-
-    return;
-
-  }
-
- 
-
-  const horasTexto = window.prompt(
-
-    "Duración del bloqueo en horas. Escribe 0 para dejarlo bloqueado hasta que el administrador lo reactive:",
-
-    "24"
-
-  );
-
-  if (horasTexto === null) return;
-
- 
-
-  const horas = Number(String(horasTexto).replace(",", "."));
-
-  if (!Number.isFinite(horas) || horas < 0) {
-
-    window.alert("Escribe una duración válida. Usa 0 para bloqueo indefinido.");
-
-    return;
-
-  }
-
- 
-
-  const bloqueoHasta = horas > 0 ? new Date(Date.now() + horas * 60 * 60 * 1000) : null;
-
-  const confirmar = window.confirm(
-
-    horas > 0
-
-      ? `¿Bloquear a ${proveedor.name} durante ${horas} hora(s)?`
-
-      : `¿Bloquear a ${proveedor.name} hasta que el administrador lo reactive?`
-
-  );
-
-  if (!confirmar) return;
-
- 
-
-  try {
-
-    await firestoreUpdateDoc(firestoreDoc(db,"proveedores",id),{
-
-      bloqueoAdmin: true,
-
-      bloqueoMotivo: String(motivo).trim(),
-
-      bloqueoHasta,
-
-      bloqueoAdminEn: firestoreServerTimestamp(),
-
-      disponible: false,
-
-      ocupado: false,
-
-      estadoConexion: "bloqueado",
-
-      servicioActualId: null,
-
-      ultimaActualizacion: firestoreServerTimestamp()
-
-    });
-
-  } catch (error) {
-
-    console.error("Error bloqueando proveedor:",error);
-
-    openModal("No fue posible bloquear",`<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`);
-
-  }
-
-};
-
- 
-
-window.reactivarProveedorBloqueado = async id => {
-
-  const proveedor = state.providers.find(p => p.id === id);
-
-  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
-
- 
-
-  if (!window.confirm(`¿Reactivar ahora a ${proveedor.name}? Podrá volver a ponerse disponible y trabajar.`)) return;
-
- 
-
-  try {
-
-    await firestoreUpdateDoc(firestoreDoc(db,"proveedores",id),{
-
-      bloqueoAdmin: false,
-
-      bloqueoMotivo: "",
-
-      bloqueoHasta: null,
-
-      bloqueoLevantadoEn: firestoreServerTimestamp(),
-
-      disponible: false,
-
-      ocupado: false,
-
-      estadoConexion: "desconectado",
-
-      servicioActualId: null,
-
-      ultimaActualizacion: firestoreServerTimestamp()
-
-    });
-
-  } catch (error) {
-
-    console.error("Error reactivando proveedor:",error);
-
-    openModal("No fue posible reactivar",`<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`);
-
-  }
 
 };
 
