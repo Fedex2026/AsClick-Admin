@@ -2774,12 +2774,7 @@ function renderAllServices(){
 
  
 
-      <td>
-        <div class="cardActions" style="margin-top:0;display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="tableAction" onclick="openService('${escaparHtml(s.folio)}')">Ver</button>
-          <button class="approve" onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Asignación manual</button>
-        </div>
-      </td>
+      <td><button class="tableAction" onclick="openService('${escaparHtml(s.folio)}')">Ver</button></td>
 
  
 
@@ -2878,7 +2873,6 @@ function fechaSolicitudProveedor(proveedor){
   return formatearFechaMembresia(
 
  
-
 
     datos.fechaSolicitud ||
 
@@ -3060,7 +3054,6 @@ function renderAuthorizations(){
 
  
 
-
   const totalPendientes =
 
  
@@ -3240,7 +3233,6 @@ function renderAuthorizations(){
             <b>Sin autorizaciones pendientes</b>
 
  
-
 
             <span>No hay proveedores ni vehículos esperando revisión.</span>
 
@@ -3422,7 +3414,6 @@ function renderAuthorizations(){
 
  
 
-
     vehiculosPendientes.forEach((a,i) => {
 
  
@@ -3603,7 +3594,6 @@ function renderProviders(){
 
  
 
-
     if (b.status === "Disponible" && a.status !== "Disponible") return 1;
 
  
@@ -3760,11 +3750,11 @@ function renderProviders(){
 
  
 
-                  ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Desbloquear proveedor</button>`
+                  ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
 
  
 
-                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Suspender / bloquear</button>`
+                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
 
  
 
@@ -3783,7 +3773,6 @@ function renderProviders(){
         `).join("")
 
  
-
 
       : `
 
@@ -3965,7 +3954,6 @@ function textoEstadoVehiculo(estado){
 
  
 
-
   const textos = {
 
  
@@ -4145,7 +4133,6 @@ function renderVehicles(){
       const membresia = obtenerNumeroMembresiaVehiculo(v,cliente);
 
  
-
 
       const vehiculoTexto = [
 
@@ -4327,7 +4314,6 @@ function renderVehicles(){
 
  
 
-
         <td><b>${escaparHtml(v.clienteNombre)}</b></td>
 
  
@@ -4507,7 +4493,6 @@ async function sincronizarVehiculoPrincipal(uidCliente,vehiculoId,cambios){
   const principalId = usuario.vehiculoPrincipal?.id || "";
 
  
-
 
   if (principalId !== vehiculoId) return;
 
@@ -4689,7 +4674,6 @@ window.openVehicle = (uidCliente,vehiculoId) => {
 
  
 
-
             ? `<button class="approve" onclick="closeModal();aprobarVehiculoDesdeLista('${escaparHtml(uidCliente)}','${escaparHtml(vehiculoId)}')">Aprobar membresía</button>`
 
  
@@ -4869,7 +4853,6 @@ window.aprobarVehiculoDesdeLista = async (uidCliente,vehiculoId) => {
     );
 
  
-
 
     await sincronizarVehiculoPrincipal(
 
@@ -5051,7 +5034,6 @@ window.quitarMembresiaVehiculo = async (uidCliente,vehiculoId) => {
 
  
 
-
     console.error("Error quitando membresía:",error);
 
  
@@ -5231,7 +5213,6 @@ window.aplicarMembresiaVehiculo = async (uidCliente,vehiculoId) => {
       cambios
 
  
-
 
     );
 
@@ -5413,7 +5394,6 @@ function obtenerCoordenadasProveedorMapa(ubicacion = {}){
 
  
 
-
   return [latitud,longitud];
 
  
@@ -5593,7 +5573,6 @@ function initFullMap(){
 }
 
  
-
 
 function obtenerIngresosUltimos7Dias(){
 
@@ -5775,7 +5754,6 @@ function drawIncomeChart(){
 
  
 
-
   const max = Math.ceil(maxValor / 1000) * 1000;
 
  
@@ -5955,7 +5933,6 @@ function drawIncomeChart(){
   const total = vals.reduce((suma,valor) => suma + valor,0);
 
  
-
 
   const totalElemento = document.querySelector(".chartPanel .panelHeader strong");
 
@@ -6137,7 +6114,6 @@ function pagoDatosGuardados(servicio){
 
  
 
-
     pago.costoProveedor ??
 
  
@@ -6317,7 +6293,6 @@ function calcularPagoServicio(servicio){
       comisionAsClick = 0;
 
  
-
 
     }
 
@@ -6499,7 +6474,6 @@ function renderPaymentKpis(servicios){
 
  
 
-
     if (p.requiereCostoGrua) return;
 
  
@@ -6679,7 +6653,6 @@ function renderPayments(){
       : escaparHtml(formatearDinero(p.comisionAsClick));
 
  
-
 
     let accion = "";
 
@@ -6861,7 +6834,6 @@ window.capturarCostoGruaPago = id => {
 
  
 
-
 };
 
  
@@ -7041,7 +7013,6 @@ window.cambiarEstadoPagoProveedor = async (id,estado) => {
   try {
 
  
-
 
     await firestoreUpdateDoc(firestoreDoc(db,"solicitudes",id),{
 
@@ -7223,7 +7194,6 @@ function exportarPagosCsv(){
 
  
 
-
 function inicializarPagos(){
 
  
@@ -7403,7 +7373,6 @@ function reportCanalServicio(servicio){
   if (textoCanal.includes("montec")) return "MONTEC";
 
  
-
 
   if (textoCanal.includes("acme")) return "ACME";
 
@@ -7585,7 +7554,6 @@ function obtenerRangoReportes(){
 
  
 
-
   const hastaInput = document.getElementById("reportDateTo")?.value || "";
 
  
@@ -7765,7 +7733,6 @@ function aplicarRangoRapidoReportes(rango = "30"){
 function reportAgrupar(lista,obtenerClave){
 
  
-
 
   return lista.reduce((map,item) => {
 
@@ -7947,7 +7914,6 @@ function reportDibujarBarras(canvasId,datos){
 
  
 
-
     ctx.fillText("Sin datos para el periodo seleccionado.",padL,45);
 
  
@@ -8127,7 +8093,6 @@ function reportDibujarTipos(canvasId,map){
   }
 
  
-
 
   const max = Math.max(...items.map(([,v])=>v),1);
 
@@ -8309,7 +8274,6 @@ function renderReportProviders(servicios){
 
  
 
-
       item.finalizados += 1;
 
  
@@ -8489,7 +8453,6 @@ function renderReports(){
   const ratings = servicios.map(reportCalificacionServicio).filter(v => v > 0);
 
  
-
 
   const ratingProm = ratings.length
 
@@ -8671,7 +8634,6 @@ function renderReports(){
 
  
 
-
   const hasta = document.getElementById("reportDateTo")?.value;
 
  
@@ -8851,7 +8813,6 @@ function inicializarReportes(){
     "reportStatusFilter",
 
  
-
 
     "reportChannelFilter"
 
@@ -9033,7 +8994,6 @@ function changeSection(section){
 
  
 
-
     );
 
  
@@ -9213,7 +9173,6 @@ function openModal(title,html){
 function closeModal(){
 
  
-
 
   document.getElementById("modalOverlay").hidden = true;
 
@@ -9395,7 +9354,6 @@ function datosCotizacionGruaAdmin(datos = {}){
 
   const grua = datos.grua || {};
 
-
  
 
   const ubicacionEnlace =
@@ -9576,7 +9534,6 @@ window.enviarCotizacionGruaWhatsAppAdmin = id => {
 
     `Condición: ${info.grua.condicion || "-"}`,
 
-
     `Liberación: ${info.grua.liberacion || "-"}`,
 
     `Carga: ${info.carga}`,
@@ -9743,7 +9700,7 @@ window.openService = folio => {
 
  
 
-        <button onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Asignación manual</button>
+        <button onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Reasignar proveedor</button>
 
  
 
@@ -9756,7 +9713,6 @@ window.openService = folio => {
  
 
       </div>
-
 
  
 
@@ -9938,7 +9894,6 @@ window.abrirUbicacionServicio = id => {
 
     openModal(
 
-
  
 
       "Ubicación no disponible",
@@ -10118,7 +10073,6 @@ window.abrirReasignacionServicio = id => {
  
 
       ${
-
 
  
 
@@ -10300,7 +10254,6 @@ window.confirmarReasignacionServicio = async id => {
 
   );
 
-
  
 
   if (!proveedor) {
@@ -10480,7 +10433,6 @@ window.confirmarReasignacionServicio = async id => {
  
 
         fechaAsignacion: firestoreServerTimestamp(),
-
 
  
 
@@ -10662,7 +10614,6 @@ window.openProvider = id => {
 
             : `<button class="reject" onclick="closeModal();darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
 
-
  
 
         }
@@ -10709,7 +10660,7 @@ window.darBajaProveedor = async id => {
 
  
 
-      "<p>No se puede bloquear a este proveedor mientras tenga un servicio activo. Primero usa Asignación manual para mover el servicio a otro proveedor y después bloquéalo.</p>"
+      "<p>No se puede dar de baja a este proveedor mientras tenga un servicio activo. Finaliza o reasigna primero el servicio.</p>"
 
  
 
@@ -10729,7 +10680,7 @@ window.darBajaProveedor = async id => {
 
  
 
-    `¿Suspender / bloquear a ${proveedor.name}? Dejará de aparecer como disponible y no podrá recibir nuevas asignaciones.`
+    `¿Dar de baja a ${proveedor.name}? Dejará de aparecer como disponible.`
 
  
 
@@ -10809,7 +10760,7 @@ window.darBajaProveedor = async id => {
 
  
 
-      "No fue posible bloquear",
+      "No fue posible dar de baja",
 
  
 
@@ -10842,7 +10793,6 @@ window.darAltaProveedor = async id => {
  
 
   const confirmar = window.confirm(
-
 
  
 
@@ -11024,7 +10974,6 @@ window.openAuth = i => {
 
 };
 
-
  
 
 async function actualizarVehiculoPrincipalSiCoincide(a,cambios){
@@ -11204,7 +11153,6 @@ window.verProveedorPendiente = id => {
  
 
           class="approve"
-
 
  
 
@@ -11386,7 +11334,6 @@ window.aprobarProveedorPendiente = async id => {
 
         ultimaActualizacion:
 
-
  
 
           firestoreServerTimestamp()
@@ -11566,7 +11513,6 @@ window.rechazarProveedorPendiente = async id => {
  
 
         fechaRechazo:
-
 
  
 
@@ -11748,7 +11694,6 @@ window.approveAuth = async i => {
 
     openModal(
 
-
  
 
       "No fue posible aprobar",
@@ -11928,7 +11873,6 @@ document
  
 
     document.getElementById("sidebar").classList.remove("open");
-
 
  
 
@@ -12110,7 +12054,6 @@ document
 
       document.getElementById("serviceSearch").value = e.target.value;
 
-
  
 
       renderAllServices();
@@ -12145,35 +12088,7 @@ document
 
  
 
-document
-
- 
-
-  .getElementById("newServiceBtn")
-
- 
-
-  .addEventListener("click",() =>
-
- 
-
-    openModal(
-
- 
-
-      "Crear servicio manual",
-
- 
-
-      "<p>La creación manual se conectará después de terminar la lectura y control de los servicios reales.</p>"
-
- 
-
-    )
-
- 
-
-  );
+document.getElementById("newServiceBtn")?.addEventListener("click",() => changeSection("reporteTelefonico"));
 
  
 
@@ -12290,7 +12205,6 @@ async function iniciarFirebaseAdmin(){
  
 
     firestoreCollectionGroup = firestoreModule.collectionGroup;
-
 
  
 
@@ -12472,7 +12386,6 @@ async function iniciarFirebaseAdmin(){
 
         escucharProveedores();
 
-
  
 
         escucharUbicacionesProveedores();
@@ -12652,7 +12565,6 @@ function escucharClientes(){
  
 
 function escucharProveedores(){
-
 
  
 
@@ -12834,7 +12746,6 @@ function convertirVehiculoRaizDesdeUsuario(cliente){
 
     subMarca: principal.subMarca || datos.subMarca || "",
 
-
  
 
     color: principal.color || datos.color || "",
@@ -13014,7 +12925,6 @@ function combinarVehiculosRaizYSubcolecciones(vehiculosSubcoleccion){
  
 
     const raiz = convertirVehiculoRaizDesdeUsuario(cliente);
-
 
  
 
@@ -13196,7 +13106,6 @@ function diasRestantesMembresia(valor){
 
   fin.setHours(0,0,0,0);
 
-
  
 
   return Math.ceil((fin.getTime() - hoy.getTime()) / 86400000);
@@ -13376,7 +13285,6 @@ function normalizarEstadoMembresiaAdmin(membresia = {}){
  
 
     return "pendiente_activacion";
-
 
  
 
@@ -13558,7 +13466,6 @@ function renderMembershipKpis(){
 
   const activas = estados.filter(e => e === "activa").length;
 
-
  
 
   const vencen = estados.filter(e => e === "vence_pronto").length;
@@ -13738,7 +13645,6 @@ function renderMemberships(){
  
 
       const dias = diasRestantesMembresia(fin);
-
 
  
 
@@ -13920,7 +13826,6 @@ function renderMemberships(){
 
         (!filtro || item.estado === filtro)
 
-
  
 
       );
@@ -14100,7 +14005,6 @@ function renderMemberships(){
  
 
             ${
-
 
  
 
@@ -14282,7 +14186,6 @@ async function obtenerMayorMembresiaExistente(){
 
         maximo = Math.max(maximo,numero);
 
-
  
 
       }
@@ -14462,7 +14365,6 @@ async function reservarMembresiasNuevas(cantidad,plan){
  
 
       }
-
 
  
 
@@ -14644,7 +14546,6 @@ window.abrirGeneradorMembresias = () => {
 
         </select>
 
-
  
 
       </p>
@@ -14824,7 +14725,6 @@ window.generarMembresiasAdmin = async () => {
  
 
   if (!confirmar) return;
-
 
  
 
@@ -15006,7 +14906,6 @@ function fechaFinRenovada(membresia){
 
     : new Date();
 
-
  
 
   base.setFullYear(base.getFullYear() + 1);
@@ -15186,7 +15085,6 @@ window.renovarMembresia = async id => {
  
 
     console.error("Error renovando membresía:",error);
-
 
  
 
@@ -15368,7 +15266,6 @@ window.cancelarMembresia = async id => {
 
       }
 
-
  
 
     );
@@ -15548,7 +15445,6 @@ function escucharVehiculosPorUsuarios(){
  
 
     return;
-
 
  
 
@@ -15730,7 +15626,6 @@ function escucharVehiculosPorUsuarios(){
 
         );
 
-
  
 
       }
@@ -15910,7 +15805,6 @@ function escucharServicios(){
  
 
       console.error("Error leyendo solicitudes:",error);
-
 
  
 
@@ -16092,8 +15986,530 @@ window.addEventListener("beforeunload",() => {
 
 });
 
-
  
+
+
+/* =========================================================
+   AS CLICK - REPORTE TELEFÓNICO ADMIN
+   Agregado sin modificar los demás módulos.
+   Reutiliza la sección Auditoría del HTML como Reporte telefónico.
+   ========================================================= */
+
+function normalizarBusquedaReporteTelefonico(valor){
+  return String(valor || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[\s\-_.]/g,"");
+}
+
+function datosClienteReporteTelefonico(cliente){
+  const d = cliente?.raw || {};
+  return {
+    uid: cliente?.id || "",
+    nombre: cliente?.name || d.nombre || d.nombreCompleto || "",
+    telefono: cliente?.phone === "No registrado" ? "" : (cliente?.phone || d.telefono || d.celular || ""),
+    membresia: [d.numeroMiembro,d.numeroMembresia,d.numeroSocio,cliente?.membership]
+      .find(v => v && !String(v).toLowerCase().includes("sin membres")) || "",
+    estadoMembresia: d.estadoMembresia || d.membresia?.estado || (cliente?.hasMembership ? "activa" : "")
+  };
+}
+
+function buscarCoincidenciasReporteTelefonico(termino){
+  const q = normalizarBusquedaReporteTelefonico(termino);
+
+  if (!q) return [];
+
+  const resultados = [];
+  const vistos = new Set();
+
+  state.clients.forEach(cliente => {
+    const dc = datosClienteReporteTelefonico(cliente);
+    const camposCliente = [dc.nombre,dc.membresia,dc.telefono].map(normalizarBusquedaReporteTelefonico);
+    const vehiculos = state.vehicles.filter(v => v.uidCliente === cliente.id);
+
+    const vehiculosCoinciden = vehiculos.filter(v =>
+      [v.placas,v.serie,v.marca,v.subMarca].some(x => normalizarBusquedaReporteTelefonico(x).includes(q))
+    );
+
+    if (camposCliente.some(x => x.includes(q)) || vehiculosCoinciden.length) {
+      const lista = vehiculosCoinciden.length ? vehiculosCoinciden : vehiculos;
+      if (!lista.length) {
+        const key = `${cliente.id}|`;
+        if (!vistos.has(key)) {
+          vistos.add(key);
+          resultados.push({cliente,vehiculo:null});
+        }
+      } else {
+        lista.forEach(vehiculo => {
+          const key = `${cliente.id}|${vehiculo.id}`;
+          if (!vistos.has(key)) {
+            vistos.add(key);
+            resultados.push({cliente,vehiculo});
+          }
+        });
+      }
+    }
+  });
+
+  return resultados.slice(0,20);
+}
+
+function htmlFormularioReporteTelefonico(){
+  return `
+    <div class="card" style="max-width:1100px;">
+      <div style="display:grid;gap:16px;">
+        <div>
+          <label><b>Buscar cliente</b></label>
+          <input id="rtBusqueda" type="text" placeholder="Nombre, número de membresía o placas"
+            style="width:100%;margin-top:7px;" autocomplete="off">
+          <div id="rtResultados" style="margin-top:8px;"></div>
+        </div>
+
+        <div id="rtClienteSeleccionado" style="display:none;border:1px solid #29435c;border-radius:12px;padding:14px;">
+          <div><b>Cliente:</b> <span id="rtNombre"></span></div>
+          <div><b>Teléfono:</b> <span id="rtTelefono"></span></div>
+          <div><b>Membresía:</b> <span id="rtMembresia"></span></div>
+          <div><b>Vehículo:</b> <span id="rtVehiculo"></span></div>
+          <div><b>Placas:</b> <span id="rtPlacas"></span></div>
+        </div>
+
+        <input type="hidden" id="rtUidCliente">
+        <input type="hidden" id="rtVehiculoId">
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div>
+            <label><b>Tipo de servicio</b></label>
+            <select id="rtTipoServicio" style="width:100%;margin-top:7px;">
+              <option value="">Selecciona</option>
+              <option value="Ajustador">Ajustador</option>
+              <option value="Abogado">Abogado</option>
+              <option value="Auxilio Vial">Auxilio vial</option>
+              <option value="Grúa">Grúa</option>
+            </select>
+          </div>
+
+          <div>
+            <label><b>Forma de asignación</b></label>
+            <select id="rtModoAsignacion" style="width:100%;margin-top:7px;">
+              <option value="automatica">Automática - más cercano</option>
+              <option value="manual">Manual</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label><b>Ubicación del servicio</b></label>
+          <input id="rtUbicacion" type="text" placeholder="Liga de Google Maps, dirección o referencia"
+            style="width:100%;margin-top:7px;">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label><b>Latitud</b></label>
+            <input id="rtLatitud" type="number" step="any" placeholder="19.4326" style="width:100%;margin-top:7px;">
+          </div>
+          <div>
+            <label><b>Longitud</b></label>
+            <input id="rtLongitud" type="number" step="any" placeholder="-99.1332" style="width:100%;margin-top:7px;">
+          </div>
+        </div>
+
+        <div id="rtProveedorManualBox" style="display:none;">
+          <label><b>Proveedor para asignación manual</b></label>
+          <select id="rtProveedorManual" style="width:100%;margin-top:7px;">
+            <option value="">Selecciona primero el tipo de servicio</option>
+          </select>
+        </div>
+
+        <div id="rtCamposGrua" style="display:none;border:1px solid #29435c;border-radius:12px;padding:14px;">
+          <b>Datos para Grúa</b>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:10px;">
+            <select id="rtGruaCondicion">
+              <option value="">Condición del vehículo</option>
+              <option value="Chocado">Chocado</option>
+              <option value="Descompuesto">Descompuesto</option>
+            </select>
+            <select id="rtGruaLiberacion">
+              <option value="">Liberación</option>
+              <option value="Liberado">Liberado</option>
+              <option value="No liberado">No liberado</option>
+            </select>
+            <select id="rtGruaCarga">
+              <option value="No">Sin carga</option>
+              <option value="Sí">Tiene carga</option>
+            </select>
+          </div>
+          <input id="rtGruaDestino" type="text" placeholder="Destino de la grúa"
+            style="width:100%;margin-top:12px;">
+        </div>
+
+        <div>
+          <label><b>Observaciones</b></label>
+          <textarea id="rtObservaciones" rows="3" placeholder="Datos proporcionados durante la llamada"
+            style="width:100%;margin-top:7px;"></textarea>
+        </div>
+
+        <div class="cardActions">
+          <button class="approve" id="rtCrearBtn" type="button">Crear y asignar reporte</button>
+          <button type="button" onclick="limpiarReporteTelefonico()">Limpiar</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function instalarReporteTelefonicoAdmin(){
+  const navAuditoria = document.querySelector('.navItem[data-section="auditoria"]');
+  if (navAuditoria) {
+    navAuditoria.dataset.section = "reporteTelefonico";
+    navAuditoria.innerHTML = `<span aria-hidden="true">☎</span><span>Reporte telefónico</span>`;
+  }
+
+  const seccionAuditoria = document.getElementById("section-auditoria");
+  if (seccionAuditoria) {
+    seccionAuditoria.id = "section-reporteTelefonico";
+    seccionAuditoria.innerHTML = htmlFormularioReporteTelefonico();
+  }
+
+  titles.reporteTelefonico = ["Reporte telefónico","Toma y asignación de servicios por llamada"];
+
+  const busqueda = document.getElementById("rtBusqueda");
+  busqueda?.addEventListener("input",mostrarResultadosReporteTelefonico);
+
+  document.getElementById("rtTipoServicio")?.addEventListener("change",() => {
+    actualizarCamposReporteTelefonico();
+    actualizarProveedoresManualesReporteTelefonico();
+  });
+
+  document.getElementById("rtModoAsignacion")?.addEventListener("change",() => {
+    actualizarCamposReporteTelefonico();
+    actualizarProveedoresManualesReporteTelefonico();
+  });
+
+  document.getElementById("rtCrearBtn")?.addEventListener("click",crearReporteTelefonico);
+
+  const btnAnterior = document.getElementById("newServiceBtn");
+  if (btnAnterior) {
+    const nuevo = btnAnterior.cloneNode(true);
+    btnAnterior.replaceWith(nuevo);
+    nuevo.addEventListener("click",() => changeSection("reporteTelefonico"));
+  }
+}
+
+function mostrarResultadosReporteTelefonico(){
+
+  const cont = document.getElementById("rtResultados");
+  if (!cont) return;
+  const termino = document.getElementById("rtBusqueda")?.value || "";
+  if (normalizarBusquedaReporteTelefonico(termino).length < 2) {
+    cont.innerHTML = "";
+    return;
+  }
+
+  const resultados = buscarCoincidenciasReporteTelefonico(termino);
+  if (!resultados.length) {
+    cont.innerHTML = `<div style="padding:10px;border:1px solid #29435c;border-radius:10px;">No se encontró cliente por nombre, membresía o placas.</div>`;
+    return;
+  }
+
+  cont.innerHTML = resultados.map((r,i) => {
+    const dc = datosClienteReporteTelefonico(r.cliente);
+    const v = r.vehiculo;
+    const vehiculo = v ? [v.marca,v.subMarca,v.color].filter(Boolean).join(" ") : "Sin vehículo";
+    return `
+      <button type="button" data-rt-index="${i}"
+        style="display:block;width:100%;text-align:left;padding:11px;margin-bottom:6px;border:1px solid #29435c;border-radius:10px;">
+        <b>${escaparHtml(dc.nombre)}</b> · ${escaparHtml(dc.membresia || "Sin número")}<br>
+        <small>${escaparHtml(vehiculo)} ${v?.placas ? `· ${escaparHtml(v.placas)}` : ""}</small>
+      </button>`;
+  }).join("");
+
+  [...cont.querySelectorAll("[data-rt-index]")].forEach(btn => {
+    btn.addEventListener("click",() => {
+      const r = resultados[Number(btn.dataset.rtIndex)];
+      seleccionarClienteReporteTelefonico(r?.cliente,r?.vehiculo);
+    });
+  });
+}
+
+function seleccionarClienteReporteTelefonico(cliente,vehiculo){
+  if (!cliente) return;
+  const dc = datosClienteReporteTelefonico(cliente);
+  document.getElementById("rtUidCliente").value = cliente.id;
+  document.getElementById("rtVehiculoId").value = vehiculo?.id || "";
+  document.getElementById("rtNombre").textContent = dc.nombre || "-";
+  document.getElementById("rtTelefono").textContent = dc.telefono || "-";
+  document.getElementById("rtMembresia").textContent = dc.membresia || "Sin membresía";
+  document.getElementById("rtVehiculo").textContent =
+    vehiculo ? [vehiculo.marca,vehiculo.subMarca,vehiculo.color].filter(Boolean).join(" ") || "-" : "Sin vehículo";
+  document.getElementById("rtPlacas").textContent = vehiculo?.placas || "-";
+  document.getElementById("rtClienteSeleccionado").style.display = "block";
+  document.getElementById("rtResultados").innerHTML = "";
+  document.getElementById("rtBusqueda").value =
+    `${dc.nombre}${vehiculo?.placas ? ` · ${vehiculo.placas}` : ""}`;
+}
+
+function actualizarCamposReporteTelefonico(){
+  const tipo = document.getElementById("rtTipoServicio")?.value || "";
+  const modo = document.getElementById("rtModoAsignacion")?.value || "automatica";
+  const grua = document.getElementById("rtCamposGrua");
+  const manual = document.getElementById("rtProveedorManualBox");
+  if (grua) grua.style.display = tipo === "Grúa" ? "block" : "none";
+  if (manual) manual.style.display = modo === "manual" ? "block" : "none";
+}
+
+function coordsReporteTelefonico(){
+  let lat = Number(document.getElementById("rtLatitud")?.value);
+  let lng = Number(document.getElementById("rtLongitud")?.value);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return {latitud:lat,longitud:lng};
+
+  const texto = document.getElementById("rtUbicacion")?.value || "";
+  const m = texto.match(/(?:q=|@)(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/i);
+  if (m) {
+    lat = Number(m[1]); lng = Number(m[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      document.getElementById("rtLatitud").value = lat;
+      document.getElementById("rtLongitud").value = lng;
+      return {latitud:lat,longitud:lng};
+    }
+  }
+  return null;
+}
+
+function ubicacionProveedorReporteTelefonico(proveedor){
+  const llaves = [proveedor?.uid,proveedor?.id].filter(Boolean);
+  for (const llave of llaves) {
+    const u = state.providerLocations.get(llave);
+    if (!u) continue;
+    const c = obtenerCoordenadasProveedorMapa(u);
+    if (c) return {latitud:c[0],longitud:c[1]};
+  }
+  return null;
+}
+
+function proveedoresReporteTelefonico(tipo){
+  const servicioTemporal = {servicio:normalizarTipoServicio(tipo)};
+  return state.providers.filter(p => proveedorDisponibleParaServicio(p,servicioTemporal));
+}
+
+function proveedoresConDistanciaReporteTelefonico(tipo,origen){
+  return proveedoresReporteTelefonico(tipo)
+    .map(p => {
+      const coords = ubicacionProveedorReporteTelefonico(p);
+      const distancia = origen && coords ? calcularDistanciaKmAdmin(origen,coords) : null;
+      return {p,distancia};
+    })
+    .sort((a,b) => {
+      if (a.distancia == null && b.distancia == null) return a.p.name.localeCompare(b.p.name,"es");
+      if (a.distancia == null) return 1;
+      if (b.distancia == null) return -1;
+      return a.distancia - b.distancia;
+    });
+}
+
+function actualizarProveedoresManualesReporteTelefonico(){
+  const select = document.getElementById("rtProveedorManual");
+  if (!select) return;
+  const tipo = document.getElementById("rtTipoServicio")?.value || "";
+  if (!tipo) {
+    select.innerHTML = `<option value="">Selecciona primero el tipo de servicio</option>`;
+    return;
+  }
+  const origen = coordsReporteTelefonico();
+  const lista = proveedoresConDistanciaReporteTelefonico(tipo,origen);
+  select.innerHTML = `<option value="">Selecciona proveedor</option>` +
+    lista.map(({p,distancia}) =>
+      `<option value="${escaparHtml(p.id)}">${escaparHtml(p.name)}${distancia != null ? ` · ${distancia.toFixed(1)} km` : ""}</option>`
+    ).join("");
+}
+
+function generarFolioReporteTelefonico(){
+  const ahora = new Date();
+  const y = ahora.getFullYear();
+  const m = String(ahora.getMonth()+1).padStart(2,"0");
+  const d = String(ahora.getDate()).padStart(2,"0");
+  const h = String(ahora.getHours()).padStart(2,"0");
+  const min = String(ahora.getMinutes()).padStart(2,"0");
+  const s = String(ahora.getSeconds()).padStart(2,"0");
+  const aleatorio = String(Math.floor(Math.random()*1000)).padStart(3,"0");
+  return `TEL-${y}${m}${d}-${h}${min}${s}-${aleatorio}`;
+}
+
+async function marcarProveedorOcupadoReporteTelefonico(proveedor,solicitudId){
+  if (!proveedor) return;
+  await firestoreUpdateDoc(
+    firestoreDoc(db,"proveedores",proveedor.id),
+    {
+      disponible:false,
+      ocupado:true,
+      estadoConexion:"ocupado",
+      servicioActualId:solicitudId,
+      ultimaActualizacion:firestoreServerTimestamp()
+    }
+  );
+}
+
+async function crearReporteTelefonico(){
+  if (!firebaseReady || !db || !firestoreSetDoc || !firestoreDoc) {
+    window.alert("Firebase todavía no está listo.");
+    return;
+  }
+
+  const uidCliente = document.getElementById("rtUidCliente")?.value || "";
+  const vehiculoId = document.getElementById("rtVehiculoId")?.value || "";
+  const tipo = document.getElementById("rtTipoServicio")?.value || "";
+  const modo = document.getElementById("rtModoAsignacion")?.value || "automatica";
+  const ubicacionTexto = document.getElementById("rtUbicacion")?.value?.trim() || "";
+  const origen = coordsReporteTelefonico();
+
+  if (!uidCliente) return window.alert("Selecciona un cliente por nombre, membresía o placas.");
+  if (!tipo) return window.alert("Selecciona el tipo de servicio.");
+  if (!ubicacionTexto && !origen) return window.alert("Captura la ubicación del servicio.");
+  if (modo === "automatica" && !origen) {
+    return window.alert("Para asignar al proveedor más cercano captura latitud y longitud o pega una liga de Google Maps con coordenadas.");
+  }
+
+  const cliente = state.clients.find(c => c.id === uidCliente);
+  const vehiculo = state.vehicles.find(v => v.uidCliente === uidCliente && v.id === vehiculoId) || null;
+  if (!cliente) return window.alert("El cliente seleccionado ya no está disponible.");
+
+  let proveedor = null;
+  let distanciaProveedorKm = null;
+
+  if (modo === "manual") {
+    const proveedorId = document.getElementById("rtProveedorManual")?.value || "";
+
+    proveedor = state.providers.find(p => p.id === proveedorId) || null;
+    if (!proveedor) return window.alert("Selecciona un proveedor para la asignación manual.");
+    if (!proveedorDisponibleParaServicio(proveedor,{servicio:tipo})) {
+      return window.alert("Ese proveedor ya no está disponible.");
+    }
+    const pc = ubicacionProveedorReporteTelefonico(proveedor);
+    distanciaProveedorKm = origen && pc ? calcularDistanciaKmAdmin(origen,pc) : null;
+  } else {
+    const candidatos = proveedoresConDistanciaReporteTelefonico(tipo,origen)
+      .filter(x => x.distancia != null);
+    if (!candidatos.length) {
+      return window.alert(`No hay proveedores ${tipo} disponibles con ubicación en tiempo real.`);
+    }
+    proveedor = candidatos[0].p;
+    distanciaProveedorKm = candidatos[0].distancia;
+  }
+
+  const dc = datosClienteReporteTelefonico(cliente);
+  const folio = generarFolioReporteTelefonico();
+  const solicitudId = `tel_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  const solicitudRef = firestoreDoc(db,"solicitudes",solicitudId);
+
+  const datosSolicitud = {
+    folio,
+    folioOficial:folio,
+    canal:"telefono",
+    origenSolicitud:"admin_reporte_telefonico",
+    creadoPorAdmin:true,
+    tipoServicio:tipo,
+    servicio:{tipo},
+    estado:"asignado",
+    creadoEn:firestoreServerTimestamp(),
+    fechaCreacion:firestoreServerTimestamp(),
+    actualizadoEn:firestoreServerTimestamp(),
+    cliente:{
+      uid:cliente.id,
+      nombre:dc.nombre,
+      telefono:dc.telefono,
+      numeroMembresia:dc.membresia,
+      tieneMembresia:cliente.hasMembership === true,
+      estadoMembresia:dc.estadoMembresia
+    },
+    uidCliente:cliente.id,
+    vehiculo:vehiculo ? {
+      id:vehiculo.id,
+      marca:vehiculo.marca || "",
+      subMarca:vehiculo.subMarca || "",
+      color:vehiculo.color || "",
+      placas:vehiculo.placas || "",
+      serie:vehiculo.serie || ""
+    } : {},
+    ubicacion:{
+      texto:ubicacionTexto,
+      enlaceGoogleMaps:ubicacionTexto.includes("http") ? ubicacionTexto : "",
+      latitud:origen?.latitud ?? null,
+      longitud:origen?.longitud ?? null
+    },
+    asignacion:{
+      modo,
+      uidProveedor:proveedor.uid || proveedor.id,
+      nombreProveedor:proveedor.name,
+      telefonoProveedor:proveedor.raw?.telefono || proveedor.raw?.celular || "",
+      tipoProveedor:proveedor.raw?.tipoProveedor || proveedor.raw?.tipo || proveedor.type || "",
+      distanciaKm:distanciaProveedorKm != null ? Number(distanciaProveedorKm.toFixed(2)) : null
+    },
+    uidProveedor:proveedor.uid || proveedor.id,
+    proveedorId:proveedor.id,
+    fechaAsignacion:firestoreServerTimestamp(),
+    comentarios:document.getElementById("rtObservaciones")?.value?.trim() || ""
+  };
+
+  if (tipo === "Grúa") {
+    datosSolicitud.grua = {
+      condicion:document.getElementById("rtGruaCondicion")?.value || "",
+      liberacion:document.getElementById("rtGruaLiberacion")?.value || "",
+      tieneCarga:document.getElementById("rtGruaCarga")?.value === "Sí",
+      carga:document.getElementById("rtGruaCarga")?.value || "No",
+      destino:document.getElementById("rtGruaDestino")?.value?.trim() || ""
+    };
+  }
+
+  const boton = document.getElementById("rtCrearBtn");
+  if (boton) boton.disabled = true;
+
+  try {
+    await firestoreSetDoc(solicitudRef,datosSolicitud);
+    await marcarProveedorOcupadoReporteTelefonico(proveedor,solicitudId);
+
+    openModal(
+      "Reporte telefónico creado",
+      `<p><b>Número de reporte:</b> ${escaparHtml(folio)}</p>
+       <p><b>Servicio:</b> ${escaparHtml(tipo)}</p>
+       <p><b>Proveedor asignado:</b> ${escaparHtml(proveedor.name)}</p>
+       ${distanciaProveedorKm != null ? `<p><b>Distancia aproximada:</b> ${distanciaProveedorKm.toFixed(1)} km</p>` : ""}
+       <div class="cardActions">
+         <button class="approve" onclick="closeModal();changeSection('servicios')">Ver servicios</button>
+         <button onclick="closeModal();limpiarReporteTelefonico()">Tomar otro reporte</button>
+       </div>`
+    );
+  } catch (error) {
+    console.error("Error creando reporte telefónico:",error);
+    openModal(
+      "No fue posible crear el reporte",
+      `<p>Firebase rechazó la operación.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
+    );
+  } finally {
+    if (boton) boton.disabled = false;
+  }
+}
+
+window.limpiarReporteTelefonico = () => {
+  const ids = ["rtBusqueda","rtUidCliente","rtVehiculoId","rtUbicacion","rtLatitud","rtLongitud","rtObservaciones","rtGruaDestino"];
+  ids.forEach(id => { const e=document.getElementById(id); if(e) e.value=""; });
+  const cliente = document.getElementById("rtClienteSeleccionado");
+  const resultados = document.getElementById("rtResultados");
+  if (cliente) cliente.style.display="none";
+  if (resultados) resultados.innerHTML="";
+  const tipo = document.getElementById("rtTipoServicio");
+  const modo = document.getElementById("rtModoAsignacion");
+  if (tipo) tipo.value="";
+  if (modo) modo.value="automatica";
+  actualizarCamposReporteTelefonico();
+  actualizarProveedoresManualesReporteTelefonico();
+};
+
+/* FIN REPORTE TELEFÓNICO ADMIN */
+
+
+instalarReporteTelefonicoAdmin();
 
 renderKpis();
 
