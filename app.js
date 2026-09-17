@@ -2774,7 +2774,12 @@ function renderAllServices(){
 
  
 
-      <td><button class="tableAction" onclick="openService('${escaparHtml(s.folio)}')">Ver</button></td>
+      <td>
+        <div class="cardActions" style="margin-top:0;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="tableAction" onclick="openService('${escaparHtml(s.folio)}')">Ver</button>
+          <button class="approve" onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Asignación manual</button>
+        </div>
+      </td>
 
  
 
@@ -2873,6 +2878,7 @@ function fechaSolicitudProveedor(proveedor){
   return formatearFechaMembresia(
 
  
+
 
     datos.fechaSolicitud ||
 
@@ -3054,6 +3060,7 @@ function renderAuthorizations(){
 
  
 
+
   const totalPendientes =
 
  
@@ -3233,6 +3240,7 @@ function renderAuthorizations(){
             <b>Sin autorizaciones pendientes</b>
 
  
+
 
             <span>No hay proveedores ni vehículos esperando revisión.</span>
 
@@ -3414,6 +3422,7 @@ function renderAuthorizations(){
 
  
 
+
     vehiculosPendientes.forEach((a,i) => {
 
  
@@ -3594,6 +3603,7 @@ function renderProviders(){
 
  
 
+
     if (b.status === "Disponible" && a.status !== "Disponible") return 1;
 
  
@@ -3750,11 +3760,11 @@ function renderProviders(){
 
  
 
-                  ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
+                  ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Desbloquear proveedor</button>`
 
  
 
-                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
+                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Suspender / bloquear</button>`
 
  
 
@@ -3773,6 +3783,7 @@ function renderProviders(){
         `).join("")
 
  
+
 
       : `
 
@@ -3954,6 +3965,7 @@ function textoEstadoVehiculo(estado){
 
  
 
+
   const textos = {
 
  
@@ -4133,6 +4145,7 @@ function renderVehicles(){
       const membresia = obtenerNumeroMembresiaVehiculo(v,cliente);
 
  
+
 
       const vehiculoTexto = [
 
@@ -4314,6 +4327,7 @@ function renderVehicles(){
 
  
 
+
         <td><b>${escaparHtml(v.clienteNombre)}</b></td>
 
  
@@ -4493,6 +4507,7 @@ async function sincronizarVehiculoPrincipal(uidCliente,vehiculoId,cambios){
   const principalId = usuario.vehiculoPrincipal?.id || "";
 
  
+
 
   if (principalId !== vehiculoId) return;
 
@@ -4674,6 +4689,7 @@ window.openVehicle = (uidCliente,vehiculoId) => {
 
  
 
+
             ? `<button class="approve" onclick="closeModal();aprobarVehiculoDesdeLista('${escaparHtml(uidCliente)}','${escaparHtml(vehiculoId)}')">Aprobar membresía</button>`
 
  
@@ -4853,6 +4869,7 @@ window.aprobarVehiculoDesdeLista = async (uidCliente,vehiculoId) => {
     );
 
  
+
 
     await sincronizarVehiculoPrincipal(
 
@@ -5034,6 +5051,7 @@ window.quitarMembresiaVehiculo = async (uidCliente,vehiculoId) => {
 
  
 
+
     console.error("Error quitando membresía:",error);
 
  
@@ -5213,6 +5231,7 @@ window.aplicarMembresiaVehiculo = async (uidCliente,vehiculoId) => {
       cambios
 
  
+
 
     );
 
@@ -5394,6 +5413,7 @@ function obtenerCoordenadasProveedorMapa(ubicacion = {}){
 
  
 
+
   return [latitud,longitud];
 
  
@@ -5573,6 +5593,7 @@ function initFullMap(){
 }
 
  
+
 
 function obtenerIngresosUltimos7Dias(){
 
@@ -5754,6 +5775,7 @@ function drawIncomeChart(){
 
  
 
+
   const max = Math.ceil(maxValor / 1000) * 1000;
 
  
@@ -5933,6 +5955,7 @@ function drawIncomeChart(){
   const total = vals.reduce((suma,valor) => suma + valor,0);
 
  
+
 
   const totalElemento = document.querySelector(".chartPanel .panelHeader strong");
 
@@ -6114,6 +6137,7 @@ function pagoDatosGuardados(servicio){
 
  
 
+
     pago.costoProveedor ??
 
  
@@ -6293,6 +6317,7 @@ function calcularPagoServicio(servicio){
       comisionAsClick = 0;
 
  
+
 
     }
 
@@ -6474,6 +6499,7 @@ function renderPaymentKpis(servicios){
 
  
 
+
     if (p.requiereCostoGrua) return;
 
  
@@ -6653,6 +6679,7 @@ function renderPayments(){
       : escaparHtml(formatearDinero(p.comisionAsClick));
 
  
+
 
     let accion = "";
 
@@ -6834,6 +6861,7 @@ window.capturarCostoGruaPago = id => {
 
  
 
+
 };
 
  
@@ -7013,6 +7041,7 @@ window.cambiarEstadoPagoProveedor = async (id,estado) => {
   try {
 
  
+
 
     await firestoreUpdateDoc(firestoreDoc(db,"solicitudes",id),{
 
@@ -7194,6 +7223,7 @@ function exportarPagosCsv(){
 
  
 
+
 function inicializarPagos(){
 
  
@@ -7373,6 +7403,7 @@ function reportCanalServicio(servicio){
   if (textoCanal.includes("montec")) return "MONTEC";
 
  
+
 
   if (textoCanal.includes("acme")) return "ACME";
 
@@ -7554,6 +7585,7 @@ function obtenerRangoReportes(){
 
  
 
+
   const hastaInput = document.getElementById("reportDateTo")?.value || "";
 
  
@@ -7733,6 +7765,7 @@ function aplicarRangoRapidoReportes(rango = "30"){
 function reportAgrupar(lista,obtenerClave){
 
  
+
 
   return lista.reduce((map,item) => {
 
@@ -7914,6 +7947,7 @@ function reportDibujarBarras(canvasId,datos){
 
  
 
+
     ctx.fillText("Sin datos para el periodo seleccionado.",padL,45);
 
  
@@ -8093,6 +8127,7 @@ function reportDibujarTipos(canvasId,map){
   }
 
  
+
 
   const max = Math.max(...items.map(([,v])=>v),1);
 
@@ -8274,6 +8309,7 @@ function renderReportProviders(servicios){
 
  
 
+
       item.finalizados += 1;
 
  
@@ -8453,6 +8489,7 @@ function renderReports(){
   const ratings = servicios.map(reportCalificacionServicio).filter(v => v > 0);
 
  
+
 
   const ratingProm = ratings.length
 
@@ -8634,6 +8671,7 @@ function renderReports(){
 
  
 
+
   const hasta = document.getElementById("reportDateTo")?.value;
 
  
@@ -8813,6 +8851,7 @@ function inicializarReportes(){
     "reportStatusFilter",
 
  
+
 
     "reportChannelFilter"
 
@@ -8994,6 +9033,7 @@ function changeSection(section){
 
  
 
+
     );
 
  
@@ -9173,6 +9213,7 @@ function openModal(title,html){
 function closeModal(){
 
  
+
 
   document.getElementById("modalOverlay").hidden = true;
 
@@ -9354,6 +9395,7 @@ function datosCotizacionGruaAdmin(datos = {}){
 
   const grua = datos.grua || {};
 
+
  
 
   const ubicacionEnlace =
@@ -9534,6 +9576,7 @@ window.enviarCotizacionGruaWhatsAppAdmin = id => {
 
     `Condición: ${info.grua.condicion || "-"}`,
 
+
     `Liberación: ${info.grua.liberacion || "-"}`,
 
     `Carga: ${info.carga}`,
@@ -9700,7 +9743,7 @@ window.openService = folio => {
 
  
 
-        <button onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Reasignar proveedor</button>
+        <button onclick="abrirReasignacionServicio('${escaparHtml(s.id)}')">Asignación manual</button>
 
  
 
@@ -9713,6 +9756,7 @@ window.openService = folio => {
  
 
       </div>
+
 
  
 
@@ -9894,6 +9938,7 @@ window.abrirUbicacionServicio = id => {
 
     openModal(
 
+
  
 
       "Ubicación no disponible",
@@ -10073,6 +10118,7 @@ window.abrirReasignacionServicio = id => {
  
 
       ${
+
 
  
 
@@ -10254,6 +10300,7 @@ window.confirmarReasignacionServicio = async id => {
 
   );
 
+
  
 
   if (!proveedor) {
@@ -10433,6 +10480,7 @@ window.confirmarReasignacionServicio = async id => {
  
 
         fechaAsignacion: firestoreServerTimestamp(),
+
 
  
 
@@ -10614,6 +10662,7 @@ window.openProvider = id => {
 
             : `<button class="reject" onclick="closeModal();darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
 
+
  
 
         }
@@ -10660,7 +10709,7 @@ window.darBajaProveedor = async id => {
 
  
 
-      "<p>No se puede dar de baja a este proveedor mientras tenga un servicio activo. Finaliza o reasigna primero el servicio.</p>"
+      "<p>No se puede bloquear a este proveedor mientras tenga un servicio activo. Primero usa Asignación manual para mover el servicio a otro proveedor y después bloquéalo.</p>"
 
  
 
@@ -10680,7 +10729,7 @@ window.darBajaProveedor = async id => {
 
  
 
-    `¿Dar de baja a ${proveedor.name}? Dejará de aparecer como disponible.`
+    `¿Suspender / bloquear a ${proveedor.name}? Dejará de aparecer como disponible y no podrá recibir nuevas asignaciones.`
 
  
 
@@ -10760,7 +10809,7 @@ window.darBajaProveedor = async id => {
 
  
 
-      "No fue posible dar de baja",
+      "No fue posible bloquear",
 
  
 
@@ -10793,6 +10842,7 @@ window.darAltaProveedor = async id => {
  
 
   const confirmar = window.confirm(
+
 
  
 
@@ -10974,6 +11024,7 @@ window.openAuth = i => {
 
 };
 
+
  
 
 async function actualizarVehiculoPrincipalSiCoincide(a,cambios){
@@ -11153,6 +11204,7 @@ window.verProveedorPendiente = id => {
  
 
           class="approve"
+
 
  
 
@@ -11334,6 +11386,7 @@ window.aprobarProveedorPendiente = async id => {
 
         ultimaActualizacion:
 
+
  
 
           firestoreServerTimestamp()
@@ -11513,6 +11566,7 @@ window.rechazarProveedorPendiente = async id => {
  
 
         fechaRechazo:
+
 
  
 
@@ -11694,6 +11748,7 @@ window.approveAuth = async i => {
 
     openModal(
 
+
  
 
       "No fue posible aprobar",
@@ -11873,6 +11928,7 @@ document
  
 
     document.getElementById("sidebar").classList.remove("open");
+
 
  
 
@@ -12054,6 +12110,7 @@ document
 
       document.getElementById("serviceSearch").value = e.target.value;
 
+
  
 
       renderAllServices();
@@ -12233,6 +12290,7 @@ async function iniciarFirebaseAdmin(){
  
 
     firestoreCollectionGroup = firestoreModule.collectionGroup;
+
 
  
 
@@ -12414,6 +12472,7 @@ async function iniciarFirebaseAdmin(){
 
         escucharProveedores();
 
+
  
 
         escucharUbicacionesProveedores();
@@ -12593,6 +12652,7 @@ function escucharClientes(){
  
 
 function escucharProveedores(){
+
 
  
 
@@ -12774,6 +12834,7 @@ function convertirVehiculoRaizDesdeUsuario(cliente){
 
     subMarca: principal.subMarca || datos.subMarca || "",
 
+
  
 
     color: principal.color || datos.color || "",
@@ -12953,6 +13014,7 @@ function combinarVehiculosRaizYSubcolecciones(vehiculosSubcoleccion){
  
 
     const raiz = convertirVehiculoRaizDesdeUsuario(cliente);
+
 
  
 
@@ -13134,6 +13196,7 @@ function diasRestantesMembresia(valor){
 
   fin.setHours(0,0,0,0);
 
+
  
 
   return Math.ceil((fin.getTime() - hoy.getTime()) / 86400000);
@@ -13313,6 +13376,7 @@ function normalizarEstadoMembresiaAdmin(membresia = {}){
  
 
     return "pendiente_activacion";
+
 
  
 
@@ -13494,6 +13558,7 @@ function renderMembershipKpis(){
 
   const activas = estados.filter(e => e === "activa").length;
 
+
  
 
   const vencen = estados.filter(e => e === "vence_pronto").length;
@@ -13673,6 +13738,7 @@ function renderMemberships(){
  
 
       const dias = diasRestantesMembresia(fin);
+
 
  
 
@@ -13854,6 +13920,7 @@ function renderMemberships(){
 
         (!filtro || item.estado === filtro)
 
+
  
 
       );
@@ -14033,6 +14100,7 @@ function renderMemberships(){
  
 
             ${
+
 
  
 
@@ -14214,6 +14282,7 @@ async function obtenerMayorMembresiaExistente(){
 
         maximo = Math.max(maximo,numero);
 
+
  
 
       }
@@ -14393,6 +14462,7 @@ async function reservarMembresiasNuevas(cantidad,plan){
  
 
       }
+
 
  
 
@@ -14574,6 +14644,7 @@ window.abrirGeneradorMembresias = () => {
 
         </select>
 
+
  
 
       </p>
@@ -14753,6 +14824,7 @@ window.generarMembresiasAdmin = async () => {
  
 
   if (!confirmar) return;
+
 
  
 
@@ -14934,6 +15006,7 @@ function fechaFinRenovada(membresia){
 
     : new Date();
 
+
  
 
   base.setFullYear(base.getFullYear() + 1);
@@ -15113,6 +15186,7 @@ window.renovarMembresia = async id => {
  
 
     console.error("Error renovando membresía:",error);
+
 
  
 
@@ -15294,6 +15368,7 @@ window.cancelarMembresia = async id => {
 
       }
 
+
  
 
     );
@@ -15473,6 +15548,7 @@ function escucharVehiculosPorUsuarios(){
  
 
     return;
+
 
  
 
@@ -15654,6 +15730,7 @@ function escucharVehiculosPorUsuarios(){
 
         );
 
+
  
 
       }
@@ -15834,6 +15911,7 @@ function escucharServicios(){
 
       console.error("Error leyendo solicitudes:",error);
 
+
  
 
     }
@@ -16013,6 +16091,7 @@ window.addEventListener("beforeunload",() => {
  
 
 });
+
 
  
 
