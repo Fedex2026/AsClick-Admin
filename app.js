@@ -16278,8 +16278,20 @@ window.capturarClienteSinMembresiaReporteTelefonico = () => {
           <label><b>Placas</b> <span style="opacity:.75;">(opcional)</span></label>
           <input id="rtSinMembresiaPlacas" type="text" style="width:100%;margin-top:6px;">
         </div>
-        <div class="cardActions">
+        <div>
 
+          <label><b>Marca</b> <span style="opacity:.75;">(opcional)</span></label>
+          <input id="rtSinMembresiaMarca" type="text" style="width:100%;margin-top:6px;">
+        </div>
+        <div>
+          <label><b>Submarca</b> <span style="opacity:.75;">(opcional)</span></label>
+          <input id="rtSinMembresiaSubMarca" type="text" style="width:100%;margin-top:6px;">
+        </div>
+        <div>
+          <label><b>Color</b> <span style="opacity:.75;">(opcional)</span></label>
+          <input id="rtSinMembresiaColor" type="text" style="width:100%;margin-top:6px;">
+        </div>
+        <div class="cardActions">
           <button class="approve" type="button" onclick="usarClienteSinMembresiaReporteTelefonico()">Usar cliente</button>
           <button type="button" onclick="closeModal()">Cancelar</button>
         </div>
@@ -16292,6 +16304,9 @@ window.usarClienteSinMembresiaReporteTelefonico = () => {
   const nombre = document.getElementById("rtSinMembresiaNombre")?.value?.trim() || "";
   const telefono = document.getElementById("rtSinMembresiaTelefono")?.value?.trim() || "";
   const placas = document.getElementById("rtSinMembresiaPlacas")?.value?.trim() || "";
+  const marca = document.getElementById("rtSinMembresiaMarca")?.value?.trim() || "";
+  const subMarca = document.getElementById("rtSinMembresiaSubMarca")?.value?.trim() || "";
+  const color = document.getElementById("rtSinMembresiaColor")?.value?.trim() || "";
 
   if (!nombre) {
     window.alert("Captura el nombre del cliente.");
@@ -16303,7 +16318,8 @@ window.usarClienteSinMembresiaReporteTelefonico = () => {
   document.getElementById("rtNombre").textContent = nombre;
   document.getElementById("rtTelefono").textContent = telefono || "-";
   document.getElementById("rtMembresia").textContent = "Sin membresía";
-  document.getElementById("rtVehiculo").textContent = placas ? "Vehículo sin registrar" : "Sin vehículo";
+  document.getElementById("rtVehiculo").textContent =
+    [marca,subMarca,color].filter(Boolean).join(" ") || (placas ? "Vehículo sin registrar" : "Sin vehículo");
   document.getElementById("rtPlacas").textContent = placas || "-";
 
   const box = document.getElementById("rtClienteSeleccionado");
@@ -16312,6 +16328,9 @@ window.usarClienteSinMembresiaReporteTelefonico = () => {
   box.dataset.nombre = nombre;
   box.dataset.telefono = telefono;
   box.dataset.placas = placas;
+  box.dataset.marca = marca;
+  box.dataset.subMarca = subMarca;
+  box.dataset.color = color;
 
   document.getElementById("rtResultados").innerHTML = "";
   document.getElementById("rtBusqueda").value = nombre;
@@ -16327,6 +16346,9 @@ function seleccionarClienteReporteTelefonico(cliente,vehiculo){
     delete seleccionado.dataset.nombre;
     delete seleccionado.dataset.telefono;
     delete seleccionado.dataset.placas;
+    delete seleccionado.dataset.marca;
+    delete seleccionado.dataset.subMarca;
+    delete seleccionado.dataset.color;
   }
   document.getElementById("rtUidCliente").value = cliente.id;
   document.getElementById("rtVehiculoId").value = vehiculo?.id || "";
@@ -16687,6 +16709,9 @@ async function crearReporteTelefonico(){
         estadoMembresia:"sin_membresia"
       };
   const placasSinMembresia = clienteSeleccionadoBox?.dataset.placas || "";
+  const marcaSinMembresia = clienteSeleccionadoBox?.dataset.marca || "";
+  const subMarcaSinMembresia = clienteSeleccionadoBox?.dataset.subMarca || "";
+  const colorSinMembresia = clienteSeleccionadoBox?.dataset.color || "";
   const folio = generarFolioReporteTelefonico();
   const solicitudId = `tel_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
   const solicitudRef = firestoreDoc(db,"solicitudes",solicitudId);
@@ -16695,6 +16720,7 @@ async function crearReporteTelefonico(){
     folio,
     folioOficial:folio,
     canal:"telefono",
+
     origenSolicitud:"admin_reporte_telefonico",
     creadoPorAdmin:true,
     tipoServicio:tipo,
@@ -16719,12 +16745,11 @@ async function crearReporteTelefonico(){
       color:vehiculo.color || "",
       placas:vehiculo.placas || "",
       serie:vehiculo.serie || ""
-    } : (placasSinMembresia ? {
-
+    } : ((placasSinMembresia || marcaSinMembresia || subMarcaSinMembresia || colorSinMembresia) ? {
       id:"",
-      marca:"",
-      subMarca:"",
-      color:"",
+      marca:marcaSinMembresia,
+      subMarca:subMarcaSinMembresia,
+      color:colorSinMembresia,
       placas:placasSinMembresia,
       serie:""
     } : {}),
@@ -16800,6 +16825,9 @@ window.limpiarReporteTelefonico = () => {
     delete cliente.dataset.nombre;
     delete cliente.dataset.telefono;
     delete cliente.dataset.placas;
+    delete cliente.dataset.marca;
+    delete cliente.dataset.subMarca;
+    delete cliente.dataset.color;
   }
   if (resultados) resultados.innerHTML="";
   const tipo = document.getElementById("rtTipoServicio");
@@ -16913,6 +16941,7 @@ window.liberarOperadorAdmin = async id => {
   if (!servicio) {
     if (!window.confirm(
       `No se encontró un servicio activo para ${proveedor.name}, pero el proveedor aparece ocupado. ¿Forzar su liberación y dejarlo Disponible?`
+
     )) return;
 
     try {
@@ -16941,7 +16970,6 @@ window.liberarOperadorAdmin = async id => {
         `<p>${escaparHtml(error?.message || String(error))}</p>`
       );
     }
-
     return;
   }
 
