@@ -3743,21 +3743,17 @@ function renderProviders(){
  
 
               ${
-
- 
-
                 p.status === "Baja"
-
- 
-
                   ? `<button class="approve" onclick="darAltaProveedor('${escaparHtml(p.id)}')">Dar de alta</button>`
-
- 
-
-                  : `<button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>`
-
- 
-
+                  : `
+                    <button onclick="suspenderProveedorAdmin('${escaparHtml(p.id)}')">Suspender proveedor</button>
+                    ${
+                      p.status === "Ocupado"
+                        ? `<button class="approve" onclick="liberarOperadorAdmin('${escaparHtml(p.id)}')">Liberar operador</button>`
+                        : ""
+                    }
+                    <button class="reject" onclick="darBajaProveedor('${escaparHtml(p.id)}')">Dar de baja</button>
+                  `
               }
 
  
@@ -16018,11 +16014,11 @@ function datosClienteReporteTelefonico(cliente){
 
 function buscarCoincidenciasReporteTelefonico(termino){
   const q = normalizarBusquedaReporteTelefonico(termino);
-
   if (!q) return [];
 
   const resultados = [];
   const vistos = new Set();
+
 
   state.clients.forEach(cliente => {
     const dc = datosClienteReporteTelefonico(cliente);
@@ -16199,11 +16195,11 @@ function instalarReporteTelefonicoAdmin(){
 }
 
 function mostrarResultadosReporteTelefonico(){
-
   const cont = document.getElementById("rtResultados");
   if (!cont) return;
   const termino = document.getElementById("rtBusqueda")?.value || "";
   if (normalizarBusquedaReporteTelefonico(termino).length < 2) {
+
     cont.innerHTML = "";
     return;
   }
@@ -16380,11 +16376,11 @@ async function crearReporteTelefonico(){
     proveedor = state.providers.find(p => p.id === proveedorId) || null;
     if (!proveedor) return window.alert("Selecciona un proveedor para la asignación manual.");
     if (!proveedorDisponibleParaServicio(proveedor,{servicio:tipo})) {
-
       return window.alert("Ese proveedor ya no está disponible.");
     }
     const pc = ubicacionProveedorReporteTelefonico(proveedor);
     distanciaProveedorKm = origen && pc ? calcularDistanciaKmAdmin(origen,pc) : null;
+
   } else {
     const candidatos = proveedoresConDistanciaReporteTelefonico(tipo,origen)
       .filter(x => x.distancia != null);
@@ -16557,102 +16553,105 @@ drawIncomeChart();
  
 
 
-/* =========================================================
-   AS CLICK - PARCHE ÚNICO: SUSPENDER / REACTIVAR PROVEEDOR
-   No sustituye "Dar de baja". Agrega una acción independiente.
-   ========================================================= */
 
 
-function proveedorSuspendidoTemporalmenteAdmin(proveedor){
-  return proveedor?.raw?.suspendidoTemporalAdmin === true;
-}
 
-window.suspenderProveedorTemporalAdmin = async proveedorId => {
-  const proveedor = state.providers.find(p => p.id === proveedorId);
+
+/* AS CLICK - SOLO SUSPENDER PROVEEDOR Y LIBERAR OPERADOR */
+
+window.suspenderProveedorAdmin = async id => {
+  const proveedor = state.providers.find(p => p.id === id);
+
   if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
 
-  const suspendido = proveedorSuspendidoTemporalmenteAdmin(proveedor);
-  const accion = suspendido ? "reactivar" : "suspender";
+  if (proveedorTieneServicioActivo(proveedor)) {
+    openModal(
+      "Proveedor ocupado",
+      "<p>Primero libera al operador de su servicio activo. Después podrás suspenderlo.</p>"
+    );
+    return;
+  }
 
-  if (!window.confirm(`¿${suspendido ? "Reactivar" : "Suspender"} temporalmente a ${proveedor.name}?`)) return;
+  if (!window.confirm(`¿Suspender temporalmente a ${proveedor.name}? No recibirá nuevas asignaciones.`)) return;
 
   try {
     await firestoreUpdateDoc(
-      firestoreDoc(db,"proveedores",proveedor.id),
-      suspendido
-        ? {
-            suspendidoTemporalAdmin:false,
-            suspendido:false,
-            activo:true,
-            disponible:true,
-            estadoConexion:"disponible",
-            ultimaActualizacion:firestoreServerTimestamp()
-          }
-        : {
-            suspendidoTemporalAdmin:true,
-            suspendido:true,
-            disponible:false,
-            estadoConexion:"suspendido",
-            ultimaActualizacion:firestoreServerTimestamp()
-          }
+      firestoreDoc(db,"proveedores",id),
+      {
+        suspendidoTemporalAdmin:true,
+        suspendido:true,
+        disponible:false,
+        estadoConexion:"suspendido",
+        ultimaActualizacion:firestoreServerTimestamp()
+      }
     );
   } catch(error) {
-    console.error(`Error al ${accion} proveedor:`,error);
-    openModal(
-      `No fue posible ${accion} al proveedor`,
-      `<p>Firebase rechazó la actualización.</p><p><b>Detalle:</b> ${escaparHtml(error?.message || String(error))}</p>`
-    );
+    console.error("Error suspendiendo proveedor:",error);
+    openModal("No fue posible suspender al proveedor",`<p>${escaparHtml(error?.message || String(error))}</p>`);
   }
 };
 
-function agregarBotonesSuspenderProveedorAdmin(){
-  const seccion = document.getElementById("section-proveedores");
-  if (!seccion) return;
+window.liberarOperadorAdmin = async id => {
+  const proveedor = state.providers.find(p => p.id === id);
+  if (!proveedor || !firestoreUpdateDoc || !firestoreDoc) return;
 
-  const tarjetas = [...seccion.querySelectorAll(".card")];
+  const servicio = state.services.find(s =>
+    servicioMantieneProveedorOcupado(s) &&
+    proveedorCoincideConUid(proveedor,s.uidProveedor)
+  );
 
-  tarjetas.forEach(tarjeta => {
-    const botonFicha = [...tarjeta.querySelectorAll("button")]
-      .find(b => b.textContent.trim() === "Ver ficha");
+  if (!servicio) {
+    openModal("Sin servicio activo","<p>No se encontró un servicio activo asignado a este proveedor.</p>");
+    return;
+  }
 
-    if (!botonFicha) return;
+  if (!window.confirm(
+    `¿Liberar a ${proveedor.name} del reporte ${servicio.folio}? El servicio quedará Pendiente / Sin asignar y el proveedor quedará Disponible.`
+  )) return;
 
-    const contenedor = botonFicha.parentElement;
-    if (!contenedor || contenedor.querySelector("[data-suspender-proveedor-admin]")) return;
+  try {
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"solicitudes",servicio.id),
+      {
+        estado:"pendiente",
+        uidProveedor:null,
+        proveedorId:null,
+        "asignacion.uidProveedor":null,
+        "asignacion.nombreProveedor":null,
+        "asignacion.telefonoProveedor":null,
+        "asignacion.fotoProveedor":null,
+        "asignacion.tipoProveedor":null,
+        "asignacion.distanciaKm":null,
+        fechaAsignacion:null,
+        actualizadoEn:firestoreServerTimestamp(),
+        liberadoPorAdmin:true,
+        fechaLiberacionAdmin:firestoreServerTimestamp()
+      }
+    );
 
-    const botonBaja = [...contenedor.querySelectorAll("button")]
-      .find(b => b.textContent.trim() === "Dar de baja" || b.textContent.trim() === "Dar de alta");
+    await firestoreUpdateDoc(
+      firestoreDoc(db,"proveedores",proveedor.id),
+      {
+        disponible:true,
+        ocupado:false,
+        estadoConexion:"disponible",
+        servicioActualId:null,
+        ultimaActualizacion:firestoreServerTimestamp()
+      }
+    );
 
-    if (!botonBaja) return;
-
-    const onclickFicha = botonFicha.getAttribute("onclick") || "";
-    const match = onclickFicha.match(/openProvider\(['"]([^'"]+)['"]\)/);
-    if (!match) return;
-
-    const proveedorId = match[1];
-    const proveedor = state.providers.find(p => p.id === proveedorId);
-    if (!proveedor) return;
-
-    const boton = document.createElement("button");
-    boton.type = "button";
-    boton.dataset.suspenderProveedorAdmin = proveedorId;
-    boton.className = proveedorSuspendidoTemporalmenteAdmin(proveedor) ? "approve" : "reject";
-    boton.textContent = proveedorSuspendidoTemporalmenteAdmin(proveedor)
-      ? "Reactivar proveedor"
-      : "Suspender proveedor";
-    boton.onclick = () => window.suspenderProveedorTemporalAdmin(proveedorId);
-
-    contenedor.insertBefore(boton,botonBaja);
-  });
-}
-
-const _renderProvidersAntesDeSuspenderAdmin = renderProviders;
-renderProviders = function(){
-  _renderProvidersAntesDeSuspenderAdmin();
-  agregarBotonesSuspenderProveedorAdmin();
+    openModal(
+      "Operador liberado",
+      `<p><b>${escaparHtml(servicio.folio)}</b> quedó Pendiente / Sin asignar.</p>
+       <p><b>${escaparHtml(proveedor.name)}</b> quedó Disponible.</p>`
+    );
+  } catch(error) {
+    console.error("Error liberando operador:",error);
+    openModal("No fue posible liberar al operador",`<p>${escaparHtml(error?.message || String(error))}</p>`);
+  }
 };
 
-/* FIN PARCHE SUSPENDER / REACTIVAR PROVEEDOR */
+/* FIN SUSPENDER PROVEEDOR Y LIBERAR OPERADOR */
 
 
 iniciarFirebaseAdmin();
