@@ -2419,132 +2419,76 @@ function recalcularKpis(){
  
 
 function renderKpis(){
-
- 
-
-  const make = ([label,value,icon,cls],index,bottom=false) => `
-
- 
-
-    <article class="kpi ${cls}">
-
- 
-
-      <div class="label">${escaparHtml(label)}</div>
-
- 
-
-      <div class="value">${escaparHtml(value)}</div>
-
- 
-
-      <div class="sub">${
-
- 
-
-        escaparHtml(
-
- 
-
-          bottom
-
- 
-
-            ? (
-
- 
-
-                (bottom && (index >= 0) && kpiBottomData[index].sub) ||
-
- 
-
-                ""
-
- 
-
-              )
-
- 
-
-            : "Ver detalles →"
-
- 
-
-        )
-
- 
-
-      }</div>
-
- 
-
-      <div class="icon">${icon}</div>
-
- 
-
-      ${
-
- 
-
-        bottom
-
- 
-
-          ? ""
-
- 
-
-          : `<svg class="spark" viewBox="0 0 80 28"><polyline points="2,22 12,18 20,20 28,10 36,14 45,8 56,13 66,9 78,12" fill="none" stroke="currentColor" stroke-width="2"/></svg>`
-
- 
-
+  if (!document.getElementById("asClickPendingBlinkStyle")) {
+    const style = document.createElement("style");
+    style.id = "asClickPendingBlinkStyle";
+    style.textContent = `
+      @keyframes asClickPendingBlink {
+        0%, 100% {
+          border-color: #ff2b2b;
+          box-shadow: 0 0 0 rgba(255,43,43,0);
+          background-color: rgba(255,43,43,.05);
+        }
+        50% {
+          border-color: #ff2b2b;
+          box-shadow: 0 0 22px rgba(255,43,43,.95);
+          background-color: rgba(255,43,43,.24);
+        }
       }
+      .kpi.as-click-pending-blink {
+        animation: asClickPendingBlink 1s ease-in-out infinite;
+      }
+      .kpi.as-click-pending-blink .label,
+      .kpi.as-click-pending-blink .value {
+        color: #ff4b4b;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
- 
+  const make = ([label,value,icon,cls],index,bottom=false) => {
+    const pendingBlink =
+      !bottom &&
+      index === 0 &&
+      Number(value) > 0
+        ? " as-click-pending-blink"
+        : "";
 
+    return `
+    <article class="kpi ${cls}${pendingBlink}">
+      <div class="label">${escaparHtml(label)}</div>
+      <div class="value">${escaparHtml(value)}</div>
+      <div class="sub">${
+        escaparHtml(
+          bottom
+            ? (
+                (bottom && (index >= 0) && kpiBottomData[index].sub) ||
+                ""
+              )
+            : "Ver detalles →"
+        )
+      }</div>
+      <div class="icon">${icon}</div>
+      ${
+        bottom
+          ? ""
+          : `<svg class="spark" viewBox="0 0 80 28"><polyline points="2,22 12,18 20,20 28,10 36,14 45,8 56,13 66,9 78,12" fill="none" stroke="currentColor" stroke-width="2"/></svg>`
+      }
     </article>
-
- 
-
   `;
-
- 
+  };
 
   const top = document.getElementById("kpiTop");
-
- 
-
   const bottom = document.getElementById("kpiBottom");
 
- 
-
   if (top) {
-
- 
-
     top.innerHTML = kpiTopData.map((d,i) => make(d,i)).join("");
-
- 
-
   }
-
- 
 
   if (bottom) {
-
- 
-
     bottom.innerHTML = kpiBottomData.map((d,i) => make(d,i,true)).join("");
-
- 
-
   }
-
- 
-
 }
-
- 
 
 function renderServices(){
 
